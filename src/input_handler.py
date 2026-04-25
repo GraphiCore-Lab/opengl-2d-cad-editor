@@ -34,13 +34,11 @@ class InputHandler:
         self.current_fill = True
         self.current_line_width = 2.0
 
-        # Çizim state
         self._drawing = False
         self._start_x = 0
         self._start_y = 0
         self._preview = None
 
-        # Move state
         self._moving = False
         self._move_last = (0, 0)
 
@@ -69,21 +67,18 @@ class InputHandler:
 
         x, y = event.pos
 
-        # 1. Önce toolbar kontrol edilir
         if self.toolbar:
             clicked_tool = self.toolbar.handle_click(x, y)
             if clicked_tool:
                 self.current_tool = clicked_tool
                 return
 
-        # 2. Sonra properties panel kontrol edilir
         if self.properties_panel:
             panel_action = self.properties_panel.handle_click(x, y)
             if panel_action:
                 self._handle_panel_action(panel_action)
                 return
 
-        # 3. Sonra canvas işlemleri yapılır
         mx, my = self._canvas_pos(event.pos)
 
         if not self._in_canvas(mx, my):
@@ -95,22 +90,11 @@ class InputHandler:
         real_x = mx + CANVAS_X
         real_y = my
 
-        if self.current_tool == TOOL_SELECT:
+        if self.current_tool in (TOOL_SELECT, TOOL_MOVE):
             selected = self.scene.select_at(real_x, real_y)
             if selected:
                 self._moving = True
                 self._move_last = (real_x, real_y)
-            self.scene.select_at(real_x, real_y)
-
-        elif self.current_tool == TOOL_MOVE:
-            selected = self.scene.select_at(real_x, real_y)
-            if selected:
-                self._moving = True
-                self._move_last = (real_x, real_y)
-            sel = self.scene.selected
-            if sel and sel.contains(real_x, real_y):
-                self._moving = True
-                self._move_last = (mx, my)
 
         elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE):
             self.scene.deselect()
@@ -120,7 +104,6 @@ class InputHandler:
 
     def _on_mouse_move(self, event):
         mx, my = self._canvas_pos(event.pos)
-
 
         if not self._in_canvas(mx, my):
             return
@@ -132,26 +115,12 @@ class InputHandler:
         real_y = my
 
         if self._moving and self.scene.selected:
-            dx = mx - self._move_last[0]
-            dy = my - self._move_last[1]
+            dx = real_x - self._move_last[0]
+            dy = real_y - self._move_last[1]
 
-            sel = self.scene.selected
+            self.scene.move_selected(dx, dy)
 
-            if hasattr(sel, "x1"):  # Line
-                sel.x1 += dx
-                sel.y1 += dy
-                sel.x2 += dx
-                sel.y2 += dy
-
-            elif hasattr(sel, "cx"):  # Circle
-                sel.cx += dx
-                sel.cy += dy
-
-            elif hasattr(sel, "x"):  # Rectangle
-                sel.x += dx
-                sel.y += dy
-
-            self._move_last = (mx, my)
+            self._move_last = (real_x, real_y)
 
         elif self._drawing:
             self._update_preview(real_x, real_y)
@@ -171,8 +140,6 @@ class InputHandler:
                 self.scene.add_shape(self._preview)
                 self.scene.select_at(*self._preview.get_center())
                 self._preview = None
-
-    # ── Properties Panel Actions ─────────────────────────────
 
     def _handle_panel_action(self, action):
         selected = self.scene.selected
@@ -207,8 +174,6 @@ class InputHandler:
         elif action == "delete":
             if hasattr(self.scene, "delete_selected"):
                 self.scene.delete_selected()
-
-    # ── Klavye ───────────────────────────────────────────────
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()

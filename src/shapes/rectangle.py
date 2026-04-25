@@ -3,6 +3,7 @@ Rectangle shape.
 """
 from OpenGL.GL import *
 from src.shapes.base import BaseShape
+import numpy as np
 
 
 class Rectangle(BaseShape):
@@ -92,4 +93,6 @@ class Rectangle(BaseShape):
         s.color = tuple(data["color"])
         s.fill = data["fill"]
         s.line_width = data["line_width"]
+        if "transform" in data:
+         s.transform = np.array(data["transform"], dtype=float)
         return s
