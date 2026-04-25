@@ -4,6 +4,7 @@ Circle shape.
 import math
 from OpenGL.GL import *
 from src.shapes.base import BaseShape
+import numpy as np
 
 
 SEGMENTS = 64
@@ -102,8 +103,11 @@ class Circle(BaseShape):
     @classmethod
     def from_dict(cls, data):
         s = cls(data["cx"], data["cy"], data["radius"])
-        s.outline_color = tuple(data.get("outline_color", data.get("color", (1.0, 1.0, 1.0))))
-        s.fill_color = tuple(data.get("fill_color", data.get("color", (0.6, 0.6, 0.6))))
-        s.fill = data["fill"]
-        s.line_width = data["line_width"]
+        s.color = tuple(data.get("color", (1.0, 1.0, 1.0)))
+        s.fill = data.get("fill", True)
+        s.line_width = data.get("line_width", 2.0)
+
+        if "transform" in data:
+            s.transform = np.array(data["transform"], dtype=float)
+
         return s

@@ -34,13 +34,11 @@ class InputHandler:
         self.current_fill = True
         self.current_line_width = 2.0
 
-        # Çizim state
         self._drawing = False
         self._start_x = 0
         self._start_y = 0
         self._preview = None
 
-        # Move state
         self._moving = False
         self._move_last = (0, 0)
 
@@ -74,21 +72,18 @@ class InputHandler:
 
         x, y = event.pos
 
-        # 1. Önce toolbar kontrol edilir
         if self.toolbar:
             clicked_tool = self.toolbar.handle_click(x, y)
             if clicked_tool:
                 self.current_tool = clicked_tool
                 return
 
-        # 2. Sonra properties panel kontrol edilir
         if self.properties_panel:
             panel_action = self.properties_panel.handle_click(x, y)
             if panel_action:
                 self._handle_panel_action(panel_action)
                 return
 
-        # 3. Sonra canvas işlemleri yapılır
         mx, my = self._canvas_pos(event.pos)
 
         if not self._in_canvas(mx, my):
@@ -100,7 +95,7 @@ class InputHandler:
         real_x = mx + CANVAS_X
         real_y = my
 
-        if self.current_tool == TOOL_SELECT:
+        if self.current_tool in (TOOL_SELECT, TOOL_MOVE):
             selected = self.scene.select_at(real_x, real_y)
             if selected:
                 self._moving = True
@@ -194,8 +189,6 @@ class InputHandler:
                 self.scene.select_at(*self._preview.get_center())
                 self._preview = None
 
-    # ── Properties Panel Actions ─────────────────────────────
-
     def _handle_panel_action(self, action):
         selected = self.scene.selected
 
@@ -237,8 +230,6 @@ class InputHandler:
         elif action == "delete":
             if hasattr(self.scene, "delete_selected"):
                 self.scene.delete_selected()
-
-    # ── Klavye ───────────────────────────────────────────────
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()

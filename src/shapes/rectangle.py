@@ -97,8 +97,6 @@ class Rectangle(BaseShape):
         s.fill_color = tuple(data.get("fill_color", data.get("color", (0.6, 0.6, 0.6))))
         s.fill = data["fill"]
         s.line_width = data["line_width"]
-
         if "transform" in data:
-            s.transform = np.array(data["transform"], dtype=float)
-
+         s.transform = np.array(data["transform"], dtype=float)
         return s
