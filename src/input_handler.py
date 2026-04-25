@@ -96,17 +96,17 @@ class InputHandler:
         real_y = my
 
         if self.current_tool == TOOL_SELECT:
-            selected = self.scene.select_at(world_x, world_y)
+            selected = self.scene.select_at(real_x, real_y)
             if selected:
                 self._moving = True
-                self._move_last = (world_x, world_y)
+                self._move_last = (real_x, real_y)
             self.scene.select_at(real_x, real_y)
 
         elif self.current_tool == TOOL_MOVE:
-            selected = self.scene.select_at(world_x, world_y)
+            selected = self.scene.select_at(real_x, real_y)
             if selected:
                 self._moving = True
-                self._move_last = (world_x, world_y)
+                self._move_last = (real_x, real_y)
             sel = self.scene.selected
             if sel and sel.contains(real_x, real_y):
                 self._moving = True
