@@ -20,7 +20,7 @@ class Line(BaseShape):
         return p1, p2
 
     def draw(self):
-        r, g, b = self.color
+        r, g, b = self.outline_color
         glColor3f(r, g, b)
         glLineWidth(self.line_width)
 
@@ -89,6 +89,7 @@ class Line(BaseShape):
     @classmethod
     def from_dict(cls, data):
         s = cls(data["x1"], data["y1"], data["x2"], data["y2"])
-        s.color = tuple(data["color"])
+        s.outline_color = tuple(data.get("outline_color", data.get("color", (1.0, 1.0, 1.0))))
+        s.fill_color = tuple(data.get("fill_color", (0.6, 0.6, 0.6)))
         s.line_width = data["line_width"]
         return s

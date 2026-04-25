@@ -3,6 +3,7 @@ Rectangle shape.
 """
 from OpenGL.GL import *
 from src.shapes.base import BaseShape
+import numpy as np
 
 
 class Rectangle(BaseShape):
@@ -25,17 +26,20 @@ class Rectangle(BaseShape):
         return [self.get_transformed_point(x, y) for x, y in self._points()]
 
     def draw(self):
-        r, g, b = self.color
-        glColor3f(r, g, b)
-        glLineWidth(self.line_width)
-
         points = self._transformed_points()
 
         if self.fill:
+            r, g, b = self.fill_color
+            glColor3f(r, g, b)
+
             glBegin(GL_QUADS)
             for x, y in points:
                 glVertex2f(x, y)
             glEnd()
+
+        r, g, b = self.outline_color
+        glColor3f(r, g, b)
+        glLineWidth(self.line_width)
 
         glBegin(GL_LINE_LOOP)
         for x, y in points:
@@ -89,7 +93,12 @@ class Rectangle(BaseShape):
     @classmethod
     def from_dict(cls, data):
         s = cls(data["x"], data["y"], data["width"], data["height"])
-        s.color = tuple(data["color"])
+        s.outline_color = tuple(data.get("outline_color", data.get("color", (1.0, 1.0, 1.0))))
+        s.fill_color = tuple(data.get("fill_color", data.get("color", (0.6, 0.6, 0.6))))
         s.fill = data["fill"]
         s.line_width = data["line_width"]
+
+        if "transform" in data:
+            s.transform = np.array(data["transform"], dtype=float)
+
         return s

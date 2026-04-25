@@ -12,7 +12,8 @@ from src.core.transform import (
 
 class BaseShape:
     def __init__(self):
-        self.color = (1.0, 1.0, 1.0)
+        self.outline_color = (1.0, 1.0, 1.0)
+        self.fill_color = (0.6, 0.6, 0.6)
         self.fill = True
         self.line_width = 2.0
         self.selected = False
@@ -53,7 +54,8 @@ class BaseShape:
     def to_dict(self):
         return {
             "type": self.__class__.__name__,
-            "color": list(self.color),
+            "outline_color": list(self.outline_color),
+            "fill_color": list(self.fill_color),
             "fill": self.fill,
             "line_width": self.line_width,
             "transform": self.transform.tolist(),
