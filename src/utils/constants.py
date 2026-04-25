@@ -72,3 +72,8 @@ TOOL_CIRCLE = "circle"
 TOOL_MOVE = "move"
 TOOL_ROTATE = "rotate"
 TOOL_SCALE = "scale"
+
+
+# ── File Save / Load ─────────────────────────────
+
+DEFAULT_SAVE_PATH = "scene.json"
