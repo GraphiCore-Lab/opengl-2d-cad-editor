@@ -81,6 +81,20 @@ class Scene:
         if self.selected:
             self.remove_shape(self.selected)
 
+                # ── Selected shape transformations ───────────────────────
+
+    def move_selected(self, dx, dy):
+        if self.selected:
+            self.selected.move(dx, dy)
+
+    def rotate_selected(self, angle_deg):
+        if self.selected:
+            self.selected.rotate(angle_deg)
+
+    def scale_selected(self, sx, sy):
+        if self.selected:
+            self.selected.scale(sx, sy)
+
     # ── Undo / Redo ──────────────────────────────────────────
 
     def _save_undo(self, action, data):
