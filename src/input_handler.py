@@ -5,7 +5,7 @@ InputHandler: mouse ve klavye olaylarını işler.
 import pygame
 
 from src.utils.constants import (
-    TOOL_SELECT, TOOL_LINE, TOOL_RECT, TOOL_CIRCLE,
+    TOOL_SELECT, TOOL_LINE, TOOL_RECT, TOOL_CIRCLE, TOOL_TRIANGLE,
     TOOL_MOVE, TOOL_ROTATE, TOOL_SCALE,
     CANVAS_X, CANVAS_W, CANVAS_H,
     GRID_SIZE, SNAP_ENABLED
@@ -14,6 +14,7 @@ from src.utils.constants import (
 from src.shapes.line import Line
 from src.shapes.rectangle import Rectangle
 from src.shapes.circle import Circle
+from src.shapes.triangle import Triangle
 
 
 def snap(val, grid=GRID_SIZE):
@@ -23,7 +24,6 @@ def snap(val, grid=GRID_SIZE):
 class InputHandler:
     def __init__(self, scene, toolbar=None, properties_panel=None, status_bar=None):
         self.scene = scene
-
         self.toolbar = toolbar
         self.properties_panel = properties_panel
         self.status_bar = status_bar
@@ -127,7 +127,7 @@ class InputHandler:
             else:
                 self._reset_action_states()
 
-        elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE):
+        elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE, TOOL_TRIANGLE):
             self.scene.deselect()
             self._reset_action_states()
             self._drawing = True
@@ -150,24 +150,34 @@ class InputHandler:
             dx = real_x - self._move_last[0]
             dy = real_y - self._move_last[1]
 
-            self.scene.move_selected(dx, dy)
+            if hasattr(self.scene, "move_selected"):
+                self.scene.move_selected(dx, dy)
+            else:
+                self.scene.selected.move(dx, dy)
+
             self._move_last = (real_x, real_y)
 
         elif self._rotating and self.scene.selected:
             dx = real_x - self._transform_last[0]
-
             angle = dx * 0.5
-            self.scene.rotate_selected(angle)
+
+            if hasattr(self.scene, "rotate_selected"):
+                self.scene.rotate_selected(angle)
+            else:
+                self.scene.selected.rotate(angle)
 
             self._transform_last = (real_x, real_y)
 
         elif self._scaling and self.scene.selected:
             dy = real_y - self._transform_last[1]
-
             factor = 1.0 + (-dy * 0.01)
             factor = max(0.1, factor)
 
-            self.scene.scale_selected(factor, factor)
+            if hasattr(self.scene, "scale_selected"):
+                self.scene.scale_selected(factor, factor)
+            else:
+                self.scene.selected.scale(factor, factor)
+
             self._transform_last = (real_x, real_y)
 
         elif self._drawing:
@@ -203,49 +213,31 @@ class InputHandler:
             if selected.line_width > 6:
                 selected.line_width = 1
 
-        elif action == "outline_red":
-            selected.color = (1.0, 0.0, 0.0)
-            selected.outline_color = (1.0, 0.0, 0.0)
+        elif action.startswith("outline_hex:"):
+            hex_code = action.split(":")[1]
+            selected.outline_color = self._hex_to_rgb(hex_code)
 
-        elif action == "outline_blue":
-            selected.color = (0.0, 0.0, 1.0)
-            selected.outline_color = (0.0, 0.0, 1.0)
-
-        elif action == "outline_black":
-            selected.color = (0.0, 0.0, 0.0)
-            selected.outline_color = (0.0, 0.0, 0.0)
-
-        elif action == "outline_white":
-            selected.color = (1.0, 1.0, 1.0)
-            selected.outline_color = (1.0, 1.0, 1.0)
-
-        elif action == "fill_red":
-            selected.color = (1.0, 0.0, 0.0)
-            selected.fill_color = (1.0, 0.0, 0.0)
-
-        elif action == "fill_blue":
-            selected.color = (0.0, 0.0, 1.0)
-            selected.fill_color = (0.0, 0.0, 1.0)
-
-        elif action == "fill_green":
-            selected.color = (0.0, 1.0, 0.0)
-            selected.fill_color = (0.0, 1.0, 0.0)
-
-        elif action == "fill_yellow":
-            selected.color = (1.0, 1.0, 0.0)
-            selected.fill_color = (1.0, 1.0, 0.0)
+        elif action.startswith("fill_hex:"):
+            hex_code = action.split(":")[1]
+            selected.fill_color = self._hex_to_rgb(hex_code)
 
         elif action == "bring_front":
-            self.scene.bring_to_front(selected)
+            if hasattr(self.scene, "bring_to_front"):
+                self.scene.bring_to_front(selected)
 
         elif action == "send_back":
-            self.scene.send_to_back(selected)
+            if hasattr(self.scene, "send_to_back"):
+                self.scene.send_to_back(selected)
 
         elif action == "duplicate":
-            self.scene.duplicate(selected)
+            if hasattr(self.scene, "duplicate"):
+                self.scene.duplicate(selected)
+            elif hasattr(self.scene, "duplicate_shape"):
+                self.scene.duplicate_shape(selected)
 
         elif action == "delete":
-            self.scene.delete_selected()
+            if hasattr(self.scene, "delete_selected"):
+                self.scene.delete_selected()
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()
@@ -255,13 +247,25 @@ class InputHandler:
             self.scene.delete_selected()
 
         elif event.key == pygame.K_r:
-            self.scene.rotate_selected(10)
+            if self.scene.selected:
+                if hasattr(self.scene, "rotate_selected"):
+                    self.scene.rotate_selected(10)
+                else:
+                    self.scene.selected.rotate(10)
 
         elif event.key in (pygame.K_EQUALS, pygame.K_KP_PLUS):
-            self.scene.scale_selected(1.1, 1.1)
+            if self.scene.selected:
+                if hasattr(self.scene, "scale_selected"):
+                    self.scene.scale_selected(1.1, 1.1)
+                else:
+                    self.scene.selected.scale(1.1, 1.1)
 
         elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
-            self.scene.scale_selected(0.9, 0.9)
+            if self.scene.selected:
+                if hasattr(self.scene, "scale_selected"):
+                    self.scene.scale_selected(0.9, 0.9)
+                else:
+                    self.scene.selected.scale(0.9, 0.9)
 
         elif event.key == pygame.K_ESCAPE:
             self.scene.deselect()
@@ -275,7 +279,10 @@ class InputHandler:
 
         elif ctrl and event.key == pygame.K_d:
             if self.scene.selected:
-                self.scene.duplicate(self.scene.selected)
+                if hasattr(self.scene, "duplicate"):
+                    self.scene.duplicate(self.scene.selected)
+                elif hasattr(self.scene, "duplicate_shape"):
+                    self.scene.duplicate_shape(self.scene.selected)
 
         elif ctrl and event.key == pygame.K_s:
             from src.utils.file_ops import save_scene
@@ -284,6 +291,15 @@ class InputHandler:
         elif ctrl and event.key == pygame.K_o:
             from src.utils.file_ops import load_scene
             load_scene(self.scene)
+
+    def _hex_to_rgb(self, hex_code):
+        hex_code = hex_code.replace("#", "")
+
+        r = int(hex_code[0:2], 16) / 255
+        g = int(hex_code[2:4], 16) / 255
+        b = int(hex_code[4:6], 16) / 255
+
+        return (r, g, b)
 
     def _canvas_pos(self, pos):
         return pos[0] - CANVAS_X, pos[1]
@@ -309,10 +325,18 @@ class InputHandler:
             r = math.hypot(mx - sx, my - sy)
             s = Circle(sx, sy, r)
 
+        elif self.current_tool == TOOL_TRIANGLE:
+            x1 = sx
+            y1 = my
+            x2 = mx
+            y2 = my
+            x3 = (sx + mx) / 2
+            y3 = sy
+            s = Triangle(x1, y1, x2, y2, x3, y3)
+
         else:
             return
 
-        s.color = self.current_color
         s.outline_color = self.current_color
         s.fill_color = self.current_color
         s.fill = self.current_fill
