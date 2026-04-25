@@ -75,12 +75,20 @@ def run():
         if preview:
             renderer.draw_preview(preview)
 
-        toolbar.draw(input_handler.current_tool)
+        toolbar.draw(
+            input_handler.current_tool,
+            input_handler.current_outline_color,
+            input_handler.current_fill_color,
+            input_handler.current_line_width
+        )
 
         selected_shape = getattr(scene, "selected", None)
         properties_panel.draw(selected_shape)
 
         status_bar.draw()
+
+        # Color picker her şeyin üstünde görünsün
+        toolbar.draw_overlay()
 
         pygame.display.flip()
         clock.tick(FPS)
@@ -90,3 +98,4 @@ def run():
 
 if __name__ == "__main__":
     run()
+    

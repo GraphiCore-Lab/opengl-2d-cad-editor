@@ -29,7 +29,9 @@ class InputHandler:
         self.status_bar = status_bar
 
         self.current_tool = TOOL_RECT
-        self.current_color = (1.0, 0.0, 0.0)
+
+        self.current_outline_color = (0.0, 0.0, 0.0)
+        self.current_fill_color = (0.8, 0.8, 0.8)
         self.current_fill = True
         self.current_line_width = 2.0
 
@@ -50,15 +52,29 @@ class InputHandler:
             self._on_mouse_down(event)
 
         elif event.type == pygame.MOUSEMOTION:
+            if self.toolbar:
+                toolbar_action = self.toolbar.handle_mouse_motion(event.pos[0], event.pos[1])
+                if toolbar_action:
+                    self._handle_toolbar_action(toolbar_action)
+
             self._on_mouse_move(event)
 
             if self.status_bar:
                 self.status_bar.update_mouse_position(event.pos[0], event.pos[1])
 
         elif event.type == pygame.MOUSEBUTTONUP:
+            if self.toolbar:
+                self.toolbar.handle_mouse_up()
+
             self._on_mouse_up(event)
 
         elif event.type == pygame.KEYDOWN:
+            if self.toolbar:
+                toolbar_action = self.toolbar.handle_key_down(event)
+                if toolbar_action:
+                    self._handle_toolbar_action(toolbar_action)
+                    return
+
             self._on_key(event)
 
     def get_preview(self):
@@ -77,9 +93,15 @@ class InputHandler:
 
         if self.toolbar:
             clicked_tool = self.toolbar.handle_click(x, y)
+
+            # Edit colors popup açıksa tıklama arkadaki canvas/panele geçmesin
+            if getattr(self.toolbar, "color_picker_open", False):
+                if clicked_tool:
+                    self._handle_toolbar_action(clicked_tool)
+                return
+
             if clicked_tool:
-                self.current_tool = clicked_tool
-                self._reset_action_states()
+                self._handle_toolbar_action(clicked_tool)
                 return
 
         if self.properties_panel:
@@ -135,6 +157,10 @@ class InputHandler:
             self._start_y = real_y
 
     def _on_mouse_move(self, event):
+        # Edit colors popup açıkken arkadaki shape çizim/taşıma/scale/rotate çalışmasın
+        if self.toolbar and getattr(self.toolbar, "color_picker_open", False):
+            return
+
         mx, my = self._canvas_pos(event.pos)
 
         if not self._in_canvas(mx, my):
@@ -150,22 +176,14 @@ class InputHandler:
             dx = real_x - self._move_last[0]
             dy = real_y - self._move_last[1]
 
-            if hasattr(self.scene, "move_selected"):
-                self.scene.move_selected(dx, dy)
-            else:
-                self.scene.selected.move(dx, dy)
-
+            self.scene.move_selected(dx, dy)
             self._move_last = (real_x, real_y)
 
         elif self._rotating and self.scene.selected:
             dx = real_x - self._transform_last[0]
             angle = dx * 0.5
 
-            if hasattr(self.scene, "rotate_selected"):
-                self.scene.rotate_selected(angle)
-            else:
-                self.scene.selected.rotate(angle)
-
+            self.scene.rotate_selected(angle)
             self._transform_last = (real_x, real_y)
 
         elif self._scaling and self.scene.selected:
@@ -173,18 +191,18 @@ class InputHandler:
             factor = 1.0 + (-dy * 0.01)
             factor = max(0.1, factor)
 
-            if hasattr(self.scene, "scale_selected"):
-                self.scene.scale_selected(factor, factor)
-            else:
-                self.scene.selected.scale(factor, factor)
-
+            self.scene.scale_selected(factor, factor)
             self._transform_last = (real_x, real_y)
 
         elif self._drawing:
             self._update_preview(real_x, real_y)
-
+    
     def _on_mouse_up(self, event):
         if event.button != 1:
+            return
+
+        if self.toolbar and getattr(self.toolbar, "color_picker_open", False):
+            self._reset_action_states()
             return
 
         if self._moving or self._rotating or self._scaling:
@@ -199,6 +217,46 @@ class InputHandler:
                 self.scene.select_at(*self._preview.get_center())
                 self._preview = None
 
+
+    def _handle_toolbar_action(self, action):
+        selected = self.scene.selected
+
+        if action.startswith("outline_color:"):
+            color = self._parse_rgb_action(action)
+            self.current_outline_color = color
+
+            if selected:
+                selected.outline_color = color
+
+            return
+
+        if action.startswith("fill_color:"):
+            color = self._parse_rgb_action(action)
+            self.current_fill_color = color
+
+            if selected:
+                selected.fill_color = color
+
+            return
+
+        if action.startswith("width:"):
+            width = float(action.split(":")[1])
+            self.current_line_width = width
+
+            if selected:
+                selected.line_width = width
+
+            return
+
+        self.current_tool = action
+        self._reset_action_states()
+
+    def _parse_rgb_action(self, action):
+        values = action.split(":")[1]
+        r, g, b = values.split(",")
+
+        return float(r), float(g), float(b)
+
     def _handle_panel_action(self, action):
         selected = self.scene.selected
 
@@ -207,37 +265,41 @@ class InputHandler:
 
         if action == "fill_toggle":
             selected.fill = not selected.fill
+            self.current_fill = selected.fill
 
         elif action == "line_width":
             selected.line_width += 1
+
             if selected.line_width > 6:
                 selected.line_width = 1
 
+            self.current_line_width = selected.line_width
+
         elif action.startswith("outline_hex:"):
             hex_code = action.split(":")[1]
-            selected.outline_color = self._hex_to_rgb(hex_code)
+            color = self._hex_to_rgb(hex_code)
+
+            selected.outline_color = color
+            self.current_outline_color = color
 
         elif action.startswith("fill_hex:"):
             hex_code = action.split(":")[1]
-            selected.fill_color = self._hex_to_rgb(hex_code)
+            color = self._hex_to_rgb(hex_code)
+
+            selected.fill_color = color
+            self.current_fill_color = color
 
         elif action == "bring_front":
-            if hasattr(self.scene, "bring_to_front"):
-                self.scene.bring_to_front(selected)
+            self.scene.bring_to_front(selected)
 
         elif action == "send_back":
-            if hasattr(self.scene, "send_to_back"):
-                self.scene.send_to_back(selected)
+            self.scene.send_to_back(selected)
 
         elif action == "duplicate":
-            if hasattr(self.scene, "duplicate"):
-                self.scene.duplicate(selected)
-            elif hasattr(self.scene, "duplicate_shape"):
-                self.scene.duplicate_shape(selected)
+            self.scene.duplicate(selected)
 
         elif action == "delete":
-            if hasattr(self.scene, "delete_selected"):
-                self.scene.delete_selected()
+            self.scene.delete_selected()
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()
@@ -248,24 +310,15 @@ class InputHandler:
 
         elif event.key == pygame.K_r:
             if self.scene.selected:
-                if hasattr(self.scene, "rotate_selected"):
-                    self.scene.rotate_selected(10)
-                else:
-                    self.scene.selected.rotate(10)
+                self.scene.rotate_selected(10)
 
         elif event.key in (pygame.K_EQUALS, pygame.K_KP_PLUS):
             if self.scene.selected:
-                if hasattr(self.scene, "scale_selected"):
-                    self.scene.scale_selected(1.1, 1.1)
-                else:
-                    self.scene.selected.scale(1.1, 1.1)
+                self.scene.scale_selected(1.1, 1.1)
 
         elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
             if self.scene.selected:
-                if hasattr(self.scene, "scale_selected"):
-                    self.scene.scale_selected(0.9, 0.9)
-                else:
-                    self.scene.selected.scale(0.9, 0.9)
+                self.scene.scale_selected(0.9, 0.9)
 
         elif event.key == pygame.K_ESCAPE:
             self.scene.deselect()
@@ -279,10 +332,7 @@ class InputHandler:
 
         elif ctrl and event.key == pygame.K_d:
             if self.scene.selected:
-                if hasattr(self.scene, "duplicate"):
-                    self.scene.duplicate(self.scene.selected)
-                elif hasattr(self.scene, "duplicate_shape"):
-                    self.scene.duplicate_shape(self.scene.selected)
+                self.scene.duplicate(self.scene.selected)
 
         elif ctrl and event.key == pygame.K_s:
             from src.utils.file_ops import save_scene
@@ -299,7 +349,7 @@ class InputHandler:
         g = int(hex_code[2:4], 16) / 255
         b = int(hex_code[4:6], 16) / 255
 
-        return (r, g, b)
+        return r, g, b
 
     def _canvas_pos(self, pos):
         return pos[0] - CANVAS_X, pos[1]
@@ -311,35 +361,40 @@ class InputHandler:
         sx, sy = self._start_x, self._start_y
 
         if self.current_tool == TOOL_LINE:
-            s = Line(sx, sy, mx, my)
+            shape = Line(sx, sy, mx, my)
 
         elif self.current_tool == TOOL_RECT:
             x = min(sx, mx)
             y = min(sy, my)
-            w = abs(mx - sx)
-            h = abs(my - sy)
-            s = Rectangle(x, y, w, h)
+            width = abs(mx - sx)
+            height = abs(my - sy)
+
+            shape = Rectangle(x, y, width, height)
 
         elif self.current_tool == TOOL_CIRCLE:
             import math
-            r = math.hypot(mx - sx, my - sy)
-            s = Circle(sx, sy, r)
+
+            radius = math.hypot(mx - sx, my - sy)
+            shape = Circle(sx, sy, radius)
 
         elif self.current_tool == TOOL_TRIANGLE:
             x1 = sx
             y1 = my
+
             x2 = mx
             y2 = my
+
             x3 = (sx + mx) / 2
             y3 = sy
-            s = Triangle(x1, y1, x2, y2, x3, y3)
+
+            shape = Triangle(x1, y1, x2, y2, x3, y3)
 
         else:
             return
 
-        s.outline_color = self.current_color
-        s.fill_color = self.current_color
-        s.fill = self.current_fill
-        s.line_width = self.current_line_width
+        shape.outline_color = self.current_outline_color
+        shape.fill_color = self.current_fill_color
+        shape.fill = self.current_fill
+        shape.line_width = self.current_line_width
 
-        self._preview = s
+        self._preview = shape
