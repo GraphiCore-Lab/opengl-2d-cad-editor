@@ -34,13 +34,12 @@ class Circle(BaseShape):
         return self.get_transformed_point(self.cx, self.cy)
 
     def draw(self):
-        r, g, b = self.color
-        glColor3f(r, g, b)
-        glLineWidth(self.line_width)
-
         points = self._transformed_points()
 
         if self.fill:
+            r, g, b = self.fill_color
+            glColor3f(r, g, b)
+
             cx, cy = self._transformed_center()
             glBegin(GL_TRIANGLE_FAN)
             glVertex2f(cx, cy)
@@ -48,6 +47,10 @@ class Circle(BaseShape):
                 glVertex2f(x, y)
             glVertex2f(points[0][0], points[0][1])
             glEnd()
+
+        r, g, b = self.outline_color
+        glColor3f(r, g, b)
+        glLineWidth(self.line_width)
 
         glBegin(GL_LINE_LOOP)
         for x, y in points:

@@ -30,7 +30,7 @@ class InputHandler:
         self.status_bar = status_bar
 
         self.current_tool = TOOL_RECT
-        self.current_color = (1.0, 1.0, 1.0)
+        self.current_color = (1.0, 0.0, 0.0)
         self.current_fill = True
         self.current_line_width = 2.0
 
@@ -41,6 +41,11 @@ class InputHandler:
 
         self._moving = False
         self._move_last = (0, 0)
+
+        # Rotate / Scale state
+        self._rotating = False
+        self._scaling = False
+        self._transform_last = (0, 0)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -96,6 +101,24 @@ class InputHandler:
                 self._moving = True
                 self._move_last = (real_x, real_y)
 
+        elif self.current_tool == TOOL_MOVE:
+            selected = self.scene.select_at(real_x, real_y)
+            if selected:
+                self._moving = True
+                self._move_last = (real_x, real_y)
+
+        elif self.current_tool == TOOL_ROTATE:
+            selected = self.scene.select_at(real_x, real_y)
+            if selected:
+                self._rotating = True
+                self._transform_last = (real_x, real_y)
+
+        elif self.current_tool == TOOL_SCALE:
+            selected = self.scene.select_at(real_x, real_y)
+            if selected:
+                self._scaling = True
+                self._transform_last = (real_x, real_y)
+
         elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE):
             self.scene.deselect()
             self._drawing = True
@@ -118,9 +141,26 @@ class InputHandler:
             dx = real_x - self._move_last[0]
             dy = real_y - self._move_last[1]
 
-            self.scene.move_selected(dx, dy)
+            self.scene.selected.move(dx, dy)
 
             self._move_last = (real_x, real_y)
+
+        elif self._rotating and self.scene.selected:
+            dx = real_x - self._transform_last[0]
+
+            self.scene.selected.rotate(dx * 0.5)
+
+            self._transform_last = (real_x, real_y)
+
+        elif self._scaling and self.scene.selected:
+            dy = real_y - self._transform_last[1]
+
+            factor = 1.0 + (-dy * 0.01)
+            factor = max(0.1, factor)
+
+            self.scene.selected.scale(factor, factor)
+
+            self._transform_last = (real_x, real_y)
 
         elif self._drawing:
             self._update_preview(real_x, real_y)
@@ -131,6 +171,14 @@ class InputHandler:
 
         if self._moving:
             self._moving = False
+            return
+
+        if self._rotating:
+            self._rotating = False
+            return
+
+        if self._scaling:
+            self._scaling = False
             return
 
         if self._drawing:
@@ -156,6 +204,14 @@ class InputHandler:
                 selected.line_width += 1
                 if selected.line_width > 6:
                     selected.line_width = 1
+
+        elif action == "outline_color":
+            if hasattr(selected, "outline_color"):
+                selected.outline_color = (0.0, 0.0, 1.0)
+
+        elif action == "fill_color":
+            if hasattr(selected, "fill_color"):
+                selected.fill_color = (1.0, 0.0, 0.0)
 
         elif action == "bring_front":
             if hasattr(self.scene, "bring_to_front"):
@@ -183,13 +239,16 @@ class InputHandler:
             self.scene.delete_selected()
 
         elif event.key == pygame.K_r:
-            self.scene.rotate_selected(10)
+            if self.scene.selected:
+                self.scene.selected.rotate(10)
 
         elif event.key in (pygame.K_PLUS, pygame.K_EQUALS):
-            self.scene.scale_selected(1.1, 1.1)
+            if self.scene.selected:
+                self.scene.selected.scale(1.1, 1.1)
 
         elif event.key in (pygame.K_MINUS, pygame.K_UNDERSCORE):
-            self.scene.scale_selected(0.9, 0.9)
+            if self.scene.selected:
+                self.scene.selected.scale(0.9, 0.9)
 
         elif event.key == pygame.K_ESCAPE:
             self.scene.deselect()
@@ -239,7 +298,8 @@ class InputHandler:
         else:
             return
 
-        s.color = self.current_color
+        s.outline_color = self.current_color
+        s.fill_color = self.current_color
         s.fill = self.current_fill
         s.line_width = self.current_line_width
 

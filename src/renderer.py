@@ -121,7 +121,7 @@ class Renderer:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
-        glColor4f(*shape.color, 0.5)
+        glColor4f(*shape.outline_color, 0.5)
         shape.draw()
 
         glDisable(GL_BLEND)

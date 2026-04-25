@@ -21,7 +21,7 @@ class Line(BaseShape):
         return p1, p2
 
     def draw(self):
-        r, g, b = self.color
+        r, g, b = self.outline_color
         glColor3f(r, g, b)
         glLineWidth(self.line_width)
 
