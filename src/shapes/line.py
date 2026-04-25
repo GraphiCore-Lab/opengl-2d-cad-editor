@@ -34,6 +34,7 @@ class Line(BaseShape):
 
         if self.selected:
             self._draw_selection_box()
+            
 
     def _draw_selection_box(self):
         x, y, w, h = self.get_bounds()

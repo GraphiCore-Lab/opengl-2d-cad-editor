@@ -1,6 +1,5 @@
 """
 InputHandler: mouse ve klavye olaylarını işler.
-Kişi 3'ün dosyası: Toolbar, properties panel ve status bar bağlantıları eklendi.
 """
 
 import pygame
@@ -42,7 +41,6 @@ class InputHandler:
         self._moving = False
         self._move_last = (0, 0)
 
-        # Rotate / Scale state
         self._rotating = False
         self._scaling = False
         self._transform_last = (0, 0)
@@ -66,6 +64,11 @@ class InputHandler:
     def get_preview(self):
         return self._preview
 
+    def _reset_action_states(self):
+        self._moving = False
+        self._rotating = False
+        self._scaling = False
+
     def _on_mouse_down(self, event):
         if event.button != 1:
             return
@@ -76,6 +79,7 @@ class InputHandler:
             clicked_tool = self.toolbar.handle_click(x, y)
             if clicked_tool:
                 self.current_tool = clicked_tool
+                self._reset_action_states()
                 return
 
         if self.properties_panel:
@@ -87,6 +91,7 @@ class InputHandler:
         mx, my = self._canvas_pos(event.pos)
 
         if not self._in_canvas(mx, my):
+            self._reset_action_states()
             return
 
         if SNAP_ENABLED:
@@ -97,30 +102,34 @@ class InputHandler:
 
         if self.current_tool in (TOOL_SELECT, TOOL_MOVE):
             selected = self.scene.select_at(real_x, real_y)
-            if selected:
-                self._moving = True
-                self._move_last = (real_x, real_y)
 
-        elif self.current_tool == TOOL_MOVE:
-            selected = self.scene.select_at(real_x, real_y)
             if selected:
                 self._moving = True
                 self._move_last = (real_x, real_y)
+            else:
+                self._reset_action_states()
 
         elif self.current_tool == TOOL_ROTATE:
             selected = self.scene.select_at(real_x, real_y)
+
             if selected:
                 self._rotating = True
                 self._transform_last = (real_x, real_y)
+            else:
+                self._reset_action_states()
 
         elif self.current_tool == TOOL_SCALE:
             selected = self.scene.select_at(real_x, real_y)
+
             if selected:
                 self._scaling = True
                 self._transform_last = (real_x, real_y)
+            else:
+                self._reset_action_states()
 
         elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE):
             self.scene.deselect()
+            self._reset_action_states()
             self._drawing = True
             self._start_x = real_x
             self._start_y = real_y
@@ -141,14 +150,14 @@ class InputHandler:
             dx = real_x - self._move_last[0]
             dy = real_y - self._move_last[1]
 
-            self.scene.selected.move(dx, dy)
-
+            self.scene.move_selected(dx, dy)
             self._move_last = (real_x, real_y)
 
         elif self._rotating and self.scene.selected:
             dx = real_x - self._transform_last[0]
 
-            self.scene.selected.rotate(dx * 0.5)
+            angle = dx * 0.5
+            self.scene.rotate_selected(angle)
 
             self._transform_last = (real_x, real_y)
 
@@ -158,8 +167,7 @@ class InputHandler:
             factor = 1.0 + (-dy * 0.01)
             factor = max(0.1, factor)
 
-            self.scene.selected.scale(factor, factor)
-
+            self.scene.scale_selected(factor, factor)
             self._transform_last = (real_x, real_y)
 
         elif self._drawing:
@@ -169,16 +177,8 @@ class InputHandler:
         if event.button != 1:
             return
 
-        if self._moving:
-            self._moving = False
-            return
-
-        if self._rotating:
-            self._rotating = False
-            return
-
-        if self._scaling:
-            self._scaling = False
+        if self._moving or self._rotating or self._scaling:
+            self._reset_action_states()
             return
 
         if self._drawing:
@@ -196,40 +196,56 @@ class InputHandler:
             return
 
         if action == "fill_toggle":
-            if hasattr(selected, "fill"):
-                selected.fill = not selected.fill
+            selected.fill = not selected.fill
 
         elif action == "line_width":
-            if hasattr(selected, "line_width"):
-                selected.line_width += 1
-                if selected.line_width > 6:
-                    selected.line_width = 1
+            selected.line_width += 1
+            if selected.line_width > 6:
+                selected.line_width = 1
 
-        elif action == "outline_color":
-            if hasattr(selected, "outline_color"):
-                selected.outline_color = (0.0, 0.0, 1.0)
+        elif action == "outline_red":
+            selected.color = (1.0, 0.0, 0.0)
+            selected.outline_color = (1.0, 0.0, 0.0)
 
-        elif action == "fill_color":
-            if hasattr(selected, "fill_color"):
-                selected.fill_color = (1.0, 0.0, 0.0)
+        elif action == "outline_blue":
+            selected.color = (0.0, 0.0, 1.0)
+            selected.outline_color = (0.0, 0.0, 1.0)
+
+        elif action == "outline_black":
+            selected.color = (0.0, 0.0, 0.0)
+            selected.outline_color = (0.0, 0.0, 0.0)
+
+        elif action == "outline_white":
+            selected.color = (1.0, 1.0, 1.0)
+            selected.outline_color = (1.0, 1.0, 1.0)
+
+        elif action == "fill_red":
+            selected.color = (1.0, 0.0, 0.0)
+            selected.fill_color = (1.0, 0.0, 0.0)
+
+        elif action == "fill_blue":
+            selected.color = (0.0, 0.0, 1.0)
+            selected.fill_color = (0.0, 0.0, 1.0)
+
+        elif action == "fill_green":
+            selected.color = (0.0, 1.0, 0.0)
+            selected.fill_color = (0.0, 1.0, 0.0)
+
+        elif action == "fill_yellow":
+            selected.color = (1.0, 1.0, 0.0)
+            selected.fill_color = (1.0, 1.0, 0.0)
 
         elif action == "bring_front":
-            if hasattr(self.scene, "bring_to_front"):
-                self.scene.bring_to_front(selected)
+            self.scene.bring_to_front(selected)
 
         elif action == "send_back":
-            if hasattr(self.scene, "send_to_back"):
-                self.scene.send_to_back(selected)
+            self.scene.send_to_back(selected)
 
         elif action == "duplicate":
-            if hasattr(self.scene, "duplicate"):
-                self.scene.duplicate(selected)
-            elif hasattr(self.scene, "duplicate_shape"):
-                self.scene.duplicate_shape(selected)
+            self.scene.duplicate(selected)
 
         elif action == "delete":
-            if hasattr(self.scene, "delete_selected"):
-                self.scene.delete_selected()
+            self.scene.delete_selected()
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()
@@ -239,19 +255,17 @@ class InputHandler:
             self.scene.delete_selected()
 
         elif event.key == pygame.K_r:
-            if self.scene.selected:
-                self.scene.selected.rotate(10)
+            self.scene.rotate_selected(10)
 
-        elif event.key in (pygame.K_PLUS, pygame.K_EQUALS):
-            if self.scene.selected:
-                self.scene.selected.scale(1.1, 1.1)
+        elif event.key in (pygame.K_EQUALS, pygame.K_KP_PLUS):
+            self.scene.scale_selected(1.1, 1.1)
 
-        elif event.key in (pygame.K_MINUS, pygame.K_UNDERSCORE):
-            if self.scene.selected:
-                self.scene.selected.scale(0.9, 0.9)
+        elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+            self.scene.scale_selected(0.9, 0.9)
 
         elif event.key == pygame.K_ESCAPE:
             self.scene.deselect()
+            self._reset_action_states()
 
         elif ctrl and event.key == pygame.K_z:
             self.scene.undo()
@@ -298,6 +312,7 @@ class InputHandler:
         else:
             return
 
+        s.color = self.current_color
         s.outline_color = self.current_color
         s.fill_color = self.current_color
         s.fill = self.current_fill
