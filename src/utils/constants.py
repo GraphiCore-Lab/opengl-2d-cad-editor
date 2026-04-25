@@ -72,7 +72,7 @@ TOOL_CIRCLE = "circle"
 TOOL_MOVE = "move"
 TOOL_ROTATE = "rotate"
 TOOL_SCALE = "scale"
-
+TOOL_TRIANGLE = "triangle"
 
 # ── File Save / Load ─────────────────────────────
 

@@ -9,6 +9,7 @@ from src.utils.constants import DEFAULT_SAVE_PATH
 from src.shapes.line import Line
 from src.shapes.rectangle import Rectangle
 from src.shapes.circle import Circle
+from src.shapes.triangle import Triangle
 
 
 def _shape_factory(data):
@@ -23,6 +24,9 @@ def _shape_factory(data):
 
     if shape_type == "Circle":
         return Circle.from_dict(data)
+
+    if shape_type == "Triangle":
+        return Triangle.from_dict(data)
 
     print(f"[load WARNING] Unknown shape type: {shape_type}")
     return None
