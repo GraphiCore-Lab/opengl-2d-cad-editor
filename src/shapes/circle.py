@@ -1,12 +1,12 @@
 """
-Circle shape — Kişi 2'nin dosyası.
+Circle shape.
 """
 import math
 from OpenGL.GL import *
 from src.shapes.base import BaseShape
 
 
-SEGMENTS = 64  # ne kadar yüksekse o kadar düzgün daire
+SEGMENTS = 64
 
 
 class Circle(BaseShape):
@@ -16,30 +16,41 @@ class Circle(BaseShape):
         self.cy = cy
         self.radius = radius
 
+    def _circle_points(self):
+        points = []
+        for i in range(SEGMENTS):
+            angle = 2 * math.pi * i / SEGMENTS
+            points.append((
+                self.cx + self.radius * math.cos(angle),
+                self.cy + self.radius * math.sin(angle),
+            ))
+        return points
+
+    def _transformed_points(self):
+        return [self.get_transformed_point(x, y) for x, y in self._circle_points()]
+
+    def _transformed_center(self):
+        return self.get_transformed_point(self.cx, self.cy)
+
     def draw(self):
         r, g, b = self.color
         glColor3f(r, g, b)
         glLineWidth(self.line_width)
 
+        points = self._transformed_points()
+
         if self.fill:
+            cx, cy = self._transformed_center()
             glBegin(GL_TRIANGLE_FAN)
-            glVertex2f(self.cx, self.cy)  # merkez
-            for i in range(SEGMENTS + 1):
-                angle = 2 * math.pi * i / SEGMENTS
-                glVertex2f(
-                    self.cx + self.radius * math.cos(angle),
-                    self.cy + self.radius * math.sin(angle),
-                )
+            glVertex2f(cx, cy)
+            for x, y in points:
+                glVertex2f(x, y)
+            glVertex2f(points[0][0], points[0][1])
             glEnd()
 
-        # Outline
         glBegin(GL_LINE_LOOP)
-        for i in range(SEGMENTS):
-            angle = 2 * math.pi * i / SEGMENTS
-            glVertex2f(
-                self.cx + self.radius * math.cos(angle),
-                self.cy + self.radius * math.sin(angle),
-            )
+        for x, y in points:
+            glVertex2f(x, y)
         glEnd()
 
         if self.selected:
@@ -52,33 +63,43 @@ class Circle(BaseShape):
         glLineStipple(2, 0xAAAA)
         glEnable(GL_LINE_STIPPLE)
         glBegin(GL_LINE_LOOP)
-        glVertex2f(x,     y)
+        glVertex2f(x, y)
         glVertex2f(x + w, y)
         glVertex2f(x + w, y + h)
-        glVertex2f(x,     y + h)
+        glVertex2f(x, y + h)
         glEnd()
         glDisable(GL_LINE_STIPPLE)
 
     def contains(self, x, y):
-        dist = math.hypot(x - self.cx, y - self.cy)
-        return dist <= self.radius
+        bx, by, bw, bh = self.get_bounds()
+        return bx <= x <= bx + bw and by <= y <= by + bh
 
     def get_bounds(self):
         pad = 6
-        return (self.cx - self.radius - pad,
-                self.cy - self.radius - pad,
-                (self.radius + pad) * 2,
-                (self.radius + pad) * 2)
+        points = self._transformed_points()
+        xs = [p[0] for p in points]
+        ys = [p[1] for p in points]
+
+        min_x = min(xs) - pad
+        min_y = min(ys) - pad
+        max_x = max(xs) + pad
+        max_y = max(ys) + pad
+
+        return min_x, min_y, max_x - min_x, max_y - min_y
 
     def to_dict(self):
         d = super().to_dict()
-        d.update({"cx": self.cx, "cy": self.cy, "radius": self.radius})
+        d.update({
+            "cx": self.cx,
+            "cy": self.cy,
+            "radius": self.radius,
+        })
         return d
 
     @classmethod
     def from_dict(cls, data):
         s = cls(data["cx"], data["cy"], data["radius"])
         s.color = tuple(data["color"])
-        s.fill  = data["fill"]
+        s.fill = data["fill"]
         s.line_width = data["line_width"]
         return s

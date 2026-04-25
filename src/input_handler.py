@@ -18,7 +18,6 @@ from src.shapes.circle import Circle
 
 
 def snap(val, grid=GRID_SIZE):
-    """Değeri en yakın grid noktasına çek."""
     return round(val / grid) * grid
 
 
@@ -45,8 +44,6 @@ class InputHandler:
         self._moving = False
         self._move_last = (0, 0)
 
-    # ── Dışarıdan çağrılır ───────────────────────────────────
-
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             self._on_mouse_down(event)
@@ -64,10 +61,7 @@ class InputHandler:
             self._on_key(event)
 
     def get_preview(self):
-        """Renderer'ın çizmesi için geçici shape döndür."""
         return self._preview
-
-    # ── Mouse olayları ───────────────────────────────────────
 
     def _on_mouse_down(self, event):
         if event.button != 1:
@@ -102,21 +96,34 @@ class InputHandler:
         real_y = my
 
         if self.current_tool == TOOL_SELECT:
+            selected = self.scene.select_at(world_x, world_y)
+            if selected:
+                self._moving = True
+                self._move_last = (world_x, world_y)
             self.scene.select_at(real_x, real_y)
 
         elif self.current_tool == TOOL_MOVE:
+            selected = self.scene.select_at(world_x, world_y)
+            if selected:
+                self._moving = True
+                self._move_last = (world_x, world_y)
             sel = self.scene.selected
             if sel and sel.contains(real_x, real_y):
                 self._moving = True
                 self._move_last = (mx, my)
 
         elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE):
+            self.scene.deselect()
             self._drawing = True
             self._start_x = real_x
             self._start_y = real_y
 
     def _on_mouse_move(self, event):
         mx, my = self._canvas_pos(event.pos)
+
+
+        if not self._in_canvas(mx, my):
+            return
 
         if SNAP_ENABLED:
             mx, my = snap(mx), snap(my)
@@ -162,6 +169,7 @@ class InputHandler:
 
             if self._preview:
                 self.scene.add_shape(self._preview)
+                self.scene.select_at(*self._preview.get_center())
                 self._preview = None
 
     # ── Properties Panel Actions ─────────────────────────────
@@ -209,6 +217,18 @@ class InputHandler:
         if event.key == pygame.K_DELETE:
             self.scene.delete_selected()
 
+        elif event.key == pygame.K_r:
+            self.scene.rotate_selected(10)
+
+        elif event.key in (pygame.K_PLUS, pygame.K_EQUALS):
+            self.scene.scale_selected(1.1, 1.1)
+
+        elif event.key in (pygame.K_MINUS, pygame.K_UNDERSCORE):
+            self.scene.scale_selected(0.9, 0.9)
+
+        elif event.key == pygame.K_ESCAPE:
+            self.scene.deselect()
+
         elif ctrl and event.key == pygame.K_z:
             self.scene.undo()
 
@@ -227,17 +247,13 @@ class InputHandler:
             from src.utils.file_ops import load_scene
             load_scene(self.scene)
 
-    # ── Yardımcılar ──────────────────────────────────────────
-
     def _canvas_pos(self, pos):
-        """Pencere koordinatını canvas koordinatına çevir."""
         return pos[0] - CANVAS_X, pos[1]
 
     def _in_canvas(self, cx, cy):
         return 0 <= cx <= CANVAS_W and 0 <= cy <= CANVAS_H
 
     def _update_preview(self, mx, my):
-        """Mouse sürüklenirken geçici shape oluştur."""
         sx, sy = self._start_x, self._start_y
 
         if self.current_tool == TOOL_LINE:
