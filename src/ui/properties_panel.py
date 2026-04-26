@@ -1,6 +1,8 @@
 from OpenGL.GL import *
 import pygame
+import os
 from src.utils.constants import WIDTH, HEIGHT
+from src.utils.fonts import load_ui_fonts
 
 
 class PropertiesPanel:
@@ -21,8 +23,14 @@ class PropertiesPanel:
         ]
 
         pygame.font.init()
-        self.font = pygame.font.SysFont("Segoe UI", 14)
-        self.title_font = pygame.font.SysFont("Segoe UI", 16, bold=True)
+        self.font, self.title_font, _ = load_ui_fonts(
+            body_size=13,
+            title_size=18,
+            small_size=11,
+        )
+
+        self.icon_size = 24
+        self.icons = self._load_panel_icons()
 
     def draw(self, selected_shape):
         glColor3f(0.96, 0.96, 0.96)
@@ -44,12 +52,20 @@ class PropertiesPanel:
             else:
                 glColor3f(0.985, 0.985, 0.985)
 
-            self._draw_rect(button["x"], button["y"], button["w"], button["h"])
+            self._draw_rounded_rect(button["x"], button["y"], button["w"], button["h"], 4)
 
             glColor3f(0.72, 0.72, 0.72)
-            self._draw_border(button["x"], button["y"], button["w"], button["h"])
+            self._draw_rounded_border(button["x"], button["y"], button["w"], button["h"], 4)
 
-            self._draw_text(button["label"], button["x"] + 10, button["y"] + 7, self.font)
+            icon = self.icons.get(button["name"])
+            text_x = button["x"] + 10
+
+            if icon is not None:
+                icon_x = button["x"] + button["w"] - 8 - icon.get_width()
+                icon_y = button["y"] + (button["h"] - icon.get_height()) / 2
+                self._draw_surface(icon, icon_x, icon_y)
+
+            self._draw_text(button["label"], text_x, button["y"] + 7, self.font)
 
     def handle_click(self, x, y):
         for button in self.buttons:
@@ -74,8 +90,85 @@ class PropertiesPanel:
         glVertex2f(x, y + h)
         glEnd()
 
+    def _rounded_rect_points(self, x, y, w, h, radius, segments=6):
+        r = max(0.0, min(float(radius), w / 2.0, h / 2.0))
+
+        if r == 0:
+            return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+
+        points = []
+        corner_data = [
+            (x + w - r, y + r, -1.5707963, 0.0),
+            (x + w - r, y + h - r, 0.0, 1.5707963),
+            (x + r, y + h - r, 1.5707963, 3.1415926),
+            (x + r, y + r, 3.1415926, 4.7123890),
+        ]
+
+        for cx, cy, start_a, end_a in corner_data:
+            for i in range(segments + 1):
+                t = i / segments
+                a = start_a + (end_a - start_a) * t
+                points.append((cx + r * pygame.math.Vector2(1, 0).rotate_rad(a).x,
+                               cy + r * pygame.math.Vector2(1, 0).rotate_rad(a).y))
+
+        return points
+
+    def _draw_rounded_rect(self, x, y, w, h, radius):
+        points = self._rounded_rect_points(x, y, w, h, radius)
+        glBegin(GL_POLYGON)
+        for px, py in points:
+            glVertex2f(px, py)
+        glEnd()
+
+    def _draw_rounded_border(self, x, y, w, h, radius):
+        points = self._rounded_rect_points(x, y, w, h, radius)
+        glBegin(GL_LINE_LOOP)
+        for px, py in points:
+            glVertex2f(px, py)
+        glEnd()
+
+    def _load_panel_icons(self):
+        icon_dir = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "assets", "icons")
+        )
+
+        icon_files = {
+            "bring_front": "icon_bringFront.png",
+            "send_back": "icon_sendBack.png",
+            "duplicate": "icon_duplicate.png",
+            "delete": "icon_cancel.png",
+        }
+
+        loaded_icons = {}
+
+        for action_name, file_name in icon_files.items():
+            path = os.path.join(icon_dir, file_name)
+
+            if not os.path.exists(path):
+                continue
+
+            try:
+                image = pygame.image.load(path).convert_alpha()
+                width, height = image.get_size()
+
+                if width <= 0 or height <= 0:
+                    continue
+
+                scale_factor = self.icon_size / max(width, height)
+                target_w = max(1, int(round(width * scale_factor)))
+                target_h = max(1, int(round(height * scale_factor)))
+
+                loaded_icons[action_name] = pygame.transform.scale(image, (target_w, target_h))
+            except pygame.error:
+                continue
+
+        return loaded_icons
+
     def _draw_text(self, text, x, y, font):
         surface = font.render(text, True, (30, 30, 30), None)
+        self._draw_surface(surface, x, y)
+
+    def _draw_surface(self, surface, x, y):
         text_data = pygame.image.tostring(surface, "RGBA", True)
 
         glEnable(GL_BLEND)

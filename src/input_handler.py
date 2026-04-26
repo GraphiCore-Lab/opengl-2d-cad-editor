@@ -47,6 +47,24 @@ class InputHandler:
         self._scaling = False
         self._transform_last = (0, 0)
 
+        self.action_hints = {
+            "select": "Click on the object you want to select",
+            "move": "Click and drag to move the selected object",
+            "rotate": "Click and drag horizontally to rotate the selected object",
+            "scale": "Click and drag vertically to scale the selected object",
+            "line": "Create a line",
+            "rect": "Create a rectangle",
+            "circle": "Create a circle",
+            "triangle": "Create a triangle",
+
+            "fill_toggle": "Click to enable or disable fill for the selected object",
+            "line_width": "Adjust line width of the selected object",
+            "bring_front": "Bring the selected object to the front",
+            "send_back": "Send the selected object to the back",
+            "duplicate": "Duplicate the selected object",
+            "delete": "Delete the selected object",
+        }
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             self._on_mouse_down(event)
@@ -250,6 +268,7 @@ class InputHandler:
 
         self.current_tool = action
         self._reset_action_states()
+        self._show_action_hint(action)
 
     def _parse_rgb_action(self, action):
         values = action.split(":")[1]
@@ -270,7 +289,7 @@ class InputHandler:
         elif action == "line_width":
             selected.line_width += 1
 
-            if selected.line_width > 6:
+            if selected.line_width > 12:
                 selected.line_width = 1
 
             self.current_line_width = selected.line_width
@@ -300,6 +319,17 @@ class InputHandler:
 
         elif action == "delete":
             self.scene.delete_selected()
+
+        self._show_action_hint(action)
+
+    def _show_action_hint(self, action):
+        if not self.status_bar:
+            return
+
+        hint = self.action_hints.get(action)
+
+        if hint:
+            self.status_bar.show_hint(hint)
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()

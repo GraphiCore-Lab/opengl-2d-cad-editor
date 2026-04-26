@@ -1,6 +1,9 @@
 from OpenGL.GL import *
 import pygame
 import colorsys
+import os
+
+from src.utils.fonts import load_ui_fonts
 
 
 class Toolbar:
@@ -8,28 +11,29 @@ class Toolbar:
         self.height = 92
 
         self.buttons = [
-            {"name": "select", "label": "Select", "x": 12, "y": 12, "w": 75, "h": 32},
-            {"name": "move", "label": "Move", "x": 92, "y": 12, "w": 65, "h": 32},
-            {"name": "rotate", "label": "Rotate", "x": 162, "y": 12, "w": 75, "h": 32},
-            {"name": "scale", "label": "Scale", "x": 242, "y": 12, "w": 65, "h": 32},
+            {"name": "select", "label": "Select", "x": 12, "y": 12, "w": 72, "h": 32},
+            {"name": "move", "label": "Move", "x": 88, "y": 12, "w": 72, "h": 32},
+            {"name": "rotate", "label": "Rotate", "x": 164, "y": 12, "w": 72, "h": 32},
+            {"name": "scale", "label": "Scale", "x": 240, "y": 12, "w": 72, "h": 32},
 
-            {"name": "line", "label": "Line", "x": 330, "y": 12, "w": 55, "h": 32},
-            {"name": "rect", "label": "Rect", "x": 390, "y": 12, "w": 55, "h": 32},
-            {"name": "circle", "label": "Circle", "x": 450, "y": 12, "w": 65, "h": 32},
-            {"name": "triangle", "label": "Tri", "x": 520, "y": 12, "w": 50, "h": 32},
-
-            {"name": "width:1", "label": "1px", "x": 590, "y": 12, "w": 45, "h": 32},
-            {"name": "width:2", "label": "2px", "x": 640, "y": 12, "w": 45, "h": 32},
-            {"name": "width:4", "label": "4px", "x": 690, "y": 12, "w": 45, "h": 32},
-            {"name": "width:6", "label": "6px", "x": 740, "y": 12, "w": 45, "h": 32},
+            {"name": "line", "label": "Line", "x": 330, "y": 12, "w": 72, "h": 32},
+            {"name": "rect", "label": "Rect", "x": 406, "y": 12, "w": 72, "h": 32},
+            {"name": "circle", "label": "Circle", "x": 482, "y": 12, "w": 72, "h": 32},
+            {"name": "triangle", "label": "Tri", "x": 558, "y": 12, "w": 72, "h": 32},
         ]
+
+        self.stroke_min = 1
+        self.stroke_mid = 6
+        self.stroke_max = 12
+        self.dragging_stroke_slider = False
+        self.stroke_slider_rect = {"x": 648, "y": 18, "w": 220, "h": 18}
 
         self.color_target = "outline"
 
         self.color_buttons = [
-            {"name": "target:outline", "label": "Outline", "x": 805, "y": 12, "w": 82, "h": 32},
-            {"name": "target:fill", "label": "Fill", "x": 895, "y": 12, "w": 62, "h": 32},
-            {"name": "open_color_picker", "label": "Edit colors", "x": 965, "y": 12, "w": 110, "h": 32},
+            {"name": "target:outline", "label": "Outline", "x": 910, "y": 12, "w": 86, "h": 32},
+            {"name": "target:fill", "label": "Fill", "x": 1004, "y": 12, "w": 86, "h": 32},
+            {"name": "open_color_picker", "label": "Edit colors", "x": 1098, "y": 12, "w": 96, "h": 32},
         ]
 
         self.color_picker_open = False
@@ -63,35 +67,45 @@ class Toolbar:
 
         self.active_input = None
         self.input_text = ""
+        self.hovered_button = None
 
         pygame.font.init()
-        self.font = pygame.font.SysFont("Segoe UI", 13)
-        self.title_font = pygame.font.SysFont("Segoe UI", 20, bold=True)
-        self.small_font = pygame.font.SysFont("Segoe UI", 12)
+        self.font, self.title_font, self.small_font = load_ui_fonts(
+            body_size=12,
+            title_size=22,
+            small_size=11,
+        )
+
+        self.icon_size = 24
+        self.icons = self._load_toolbar_icons()
 
     def draw(self, active_tool, current_outline=None, current_fill=None, line_width=2):
         self._draw_toolbar_background()
 
         self._draw_group_title("Tools", 12, 72)
         self._draw_group_title("Shapes", 330, 72)
-        self._draw_group_title("Size", 590, 72)
-        self._draw_group_title("Colors", 805, 72)
+        self._draw_group_title("Size", 648, 72)
+        self._draw_group_title("Colors", 910, 72)
 
         for button in self.buttons:
             active = button["name"] == active_tool
+            hovered = button["name"] == self.hovered_button
 
-            if button["name"].startswith("width:"):
-                width_value = int(button["name"].split(":")[1])
-                active = width_value == int(line_width)
+            self._draw_button(button, active, hovered=hovered)
 
-            self._draw_button(button, active)
+        self._draw_stroke_slider(line_width)
 
         for button in self.color_buttons:
             active = button["name"] == f"target:{self.color_target}"
-            self._draw_button(button, active)
+            hovered = button["name"] == self.hovered_button
+            indicator_color = None
 
-        self._draw_color_preview(805, 50, current_outline, "Outline")
-        self._draw_color_preview(895, 50, current_fill, "Fill")
+            if button["name"] == "target:outline":
+                indicator_color = current_outline
+            elif button["name"] == "target:fill":
+                indicator_color = current_fill
+
+            self._draw_button(button, active, hovered=hovered, indicator_color=indicator_color)
 
     def draw_overlay(self):
         if self.color_picker_open:
@@ -100,6 +114,11 @@ class Toolbar:
     def handle_click(self, x, y):
         if self.color_picker_open:
             return self._handle_color_picker_click(x, y)
+
+        if self._inside(self.stroke_slider_rect, x, y):
+            self.dragging_stroke_slider = True
+            width = self._width_from_slider_x(x)
+            return f"width:{width}"
 
         for button in self.buttons:
             if self._inside(button, x, y):
@@ -123,7 +142,16 @@ class Toolbar:
 
     def handle_mouse_motion(self, x, y):
         if not self.color_picker_open:
+            self._update_hovered_button(x, y)
+
+        if self.dragging_stroke_slider and not self.color_picker_open:
+            width = self._width_from_slider_x(x)
+            return f"width:{width}"
+
+        if not self.color_picker_open:
             return None
+
+        self.hovered_button = None
 
         if self.dragging_gradient:
             self._select_from_gradient(x, y)
@@ -136,6 +164,7 @@ class Toolbar:
         return None
 
     def handle_mouse_up(self):
+        self.dragging_stroke_slider = False
         self.dragging_gradient = False
         self.dragging_value = False
 
@@ -567,28 +596,211 @@ class Toolbar:
         glVertex2f(1200, self.height)
         glEnd()
 
-        for x in [318, 580, 795]:
+        for x in [318, 636, 900]:
             glColor3f(0.82, 0.82, 0.82)
             glBegin(GL_LINES)
             glVertex2f(x, 8)
             glVertex2f(x, 84)
             glEnd()
 
-    def _draw_button(self, button, active=False):
+    def _draw_button(self, button, active=False, hovered=False, indicator_color=None):
         if active:
             glColor3f(0.72, 0.86, 1.0)
+        elif hovered:
+            glColor3f(0.93, 0.93, 0.93)
         else:
             glColor3f(0.985, 0.985, 0.985)
 
-        self._draw_rect(button["x"], button["y"], button["w"], button["h"])
+        self._draw_rounded_rect(button["x"], button["y"], button["w"], button["h"], 4)
 
         if active:
             glColor3f(0.1, 0.45, 0.8)
+        elif hovered:
+            glColor3f(0.58, 0.58, 0.58)
         else:
             glColor3f(0.72, 0.72, 0.72)
 
-        self._draw_border(button["x"], button["y"], button["w"], button["h"])
-        self._draw_text(button["label"], button["x"] + 8, button["y"] + 9, self.font)
+        self._draw_rounded_border(button["x"], button["y"], button["w"], button["h"], 4)
+
+        icon = self.icons.get(button["name"])
+        icon_padding_right = 6
+        text_x = button["x"] + 8
+        text_limit_x = button["x"] + button["w"] - 8
+
+        if icon is not None:
+            icon_x = button["x"] + button["w"] - icon_padding_right - icon.get_width()
+            icon_y = button["y"] + (button["h"] - icon.get_height()) / 2
+            self._draw_surface(icon, icon_x, icon_y)
+            text_limit_x = min(text_limit_x, icon_x - 4)
+
+        if indicator_color is not None:
+            cx = button["x"] + button["w"] - 13
+            cy = button["y"] + button["h"] / 2
+
+            glColor3f(*indicator_color)
+            self._draw_circle(cx, cy, 8, fill=True)
+
+            glColor3f(0.2, 0.2, 0.2)
+            self._draw_circle(cx, cy, 8, fill=False)
+            text_limit_x = min(text_limit_x, cx - 12)
+
+        max_text_width = max(8, text_limit_x - text_x)
+        label_text, label_font = self._fit_label(button["label"], max_text_width)
+        self._draw_text(label_text, text_x, button["y"] + 9, label_font)
+
+    def _draw_stroke_slider(self, line_width):
+        sx = self.stroke_slider_rect["x"]
+        sy = self.stroke_slider_rect["y"]
+        sw = self.stroke_slider_rect["w"]
+        sh = self.stroke_slider_rect["h"]
+
+        track_y = sy + sh / 2
+        ratio = self._slider_ratio_from_width(line_width)
+        handle_x = sx + ratio * sw
+        max_thickness = float(self.stroke_max)
+        base_y = track_y + max_thickness / 2
+
+        # Right-angled tapered track: flat bottom, sloped top.
+        glColor3f(0.78, 0.78, 0.78)
+        glBegin(GL_TRIANGLES)
+        glVertex2f(sx, base_y)
+        glVertex2f(sx + sw, base_y)
+        glVertex2f(sx + sw, base_y - max_thickness)
+        glEnd()
+
+        glColor3f(0.52, 0.52, 0.52)
+        glBegin(GL_LINE_LOOP)
+        glVertex2f(sx, base_y)
+        glVertex2f(sx + sw, base_y)
+        glVertex2f(sx + sw, base_y - max_thickness)
+        glEnd()
+
+        # Middle marker: center visually maps to 6 px.
+        mid_x = sx + sw / 2
+        glColor3f(0.48, 0.48, 0.48)
+        glLineWidth(2.0)
+        glBegin(GL_LINES)
+        glVertex2f(mid_x, base_y - max_thickness - 2)
+        glVertex2f(mid_x, base_y + 2)
+        glEnd()
+
+        local_thickness = max(self.stroke_min, min(self.stroke_max, float(line_width)))
+        handle_size = max(12.0, local_thickness + 6.0)
+        handle_center_y = base_y - (local_thickness / 2.0)
+
+        glColor3f(0.985, 0.985, 0.985)
+        self._draw_rect(
+            handle_x - handle_size / 2,
+            handle_center_y - handle_size / 2,
+            handle_size,
+            handle_size,
+        )
+        glColor3f(0.35, 0.35, 0.35)
+        self._draw_border(
+            handle_x - handle_size / 2,
+            handle_center_y - handle_size / 2,
+            handle_size,
+            handle_size,
+        )
+
+        self._draw_text(f"{int(round(line_width))}px", sx + sw + 8, sy - 1, self.font)
+        self._draw_text("1", sx - 3, sy + 22, self.small_font)
+        self._draw_text("6", mid_x - 3, sy + 22, self.small_font)
+        self._draw_text("12", sx + sw - 7, sy + 22, self.small_font)
+
+        glLineWidth(1.0)
+
+    def _slider_ratio_from_width(self, width):
+        width = max(self.stroke_min, min(self.stroke_max, float(width)))
+
+        if width <= self.stroke_mid:
+            return ((width - self.stroke_min) / (self.stroke_mid - self.stroke_min)) * 0.5
+
+        return 0.5 + ((width - self.stroke_mid) / (self.stroke_max - self.stroke_mid)) * 0.5
+
+    def _width_from_slider_x(self, x):
+        sx = self.stroke_slider_rect["x"]
+        sw = self.stroke_slider_rect["w"]
+        ratio = (x - sx) / sw
+        ratio = max(0.0, min(1.0, ratio))
+
+        if ratio <= 0.5:
+            width = self.stroke_min + (ratio / 0.5) * (self.stroke_mid - self.stroke_min)
+        else:
+            width = self.stroke_mid + ((ratio - 0.5) / 0.5) * (self.stroke_max - self.stroke_mid)
+
+        return int(round(width))
+
+    def _load_toolbar_icons(self):
+        icon_dir = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "assets", "icons")
+        )
+
+        icon_files = {
+            "select": "icon_select.png",
+            "move": "icon_move.png",
+            "rotate": "icon_rotate.png",
+            "scale": "icon_scale.png",
+            "line": "icon_line.png",
+            "rect": "icon_rect.png",
+            "circle": "icon_circle.png",
+            "triangle": "icon_triangle.png",
+            "open_color_picker": "icon_edit_colors.png",
+        }
+
+        loaded_icons = {}
+
+        for button_name, file_name in icon_files.items():
+            icon_path = os.path.join(icon_dir, file_name)
+
+            if not os.path.exists(icon_path):
+                continue
+
+            try:
+                image = pygame.image.load(icon_path).convert_alpha()
+                width, height = image.get_size()
+
+                if width <= 0 or height <= 0:
+                    continue
+
+                scale_factor = self.icon_size / max(width, height)
+                target_w = max(1, int(round(width * scale_factor)))
+                target_h = max(1, int(round(height * scale_factor)))
+
+                loaded_icons[button_name] = pygame.transform.scale(image, (target_w, target_h))
+            except pygame.error:
+                continue
+
+        return loaded_icons
+
+    def _fit_label(self, label, max_width):
+        if self.font.size(label)[0] <= max_width:
+            return label, self.font
+
+        if self.small_font.size(label)[0] <= max_width:
+            return label, self.small_font
+
+        candidate = label
+        while len(candidate) > 1 and self.small_font.size(candidate + ".")[0] > max_width:
+            candidate = candidate[:-1]
+
+        if not candidate:
+            return "", self.small_font
+
+        return candidate + ".", self.small_font
+
+    def _update_hovered_button(self, x, y):
+        self.hovered_button = None
+
+        for button in self.buttons:
+            if self._inside(button, x, y):
+                self.hovered_button = button["name"]
+                return
+
+        for button in self.color_buttons:
+            if self._inside(button, x, y):
+                self.hovered_button = button["name"]
+                return
 
     def _draw_color_preview(self, x, y, color, label):
         if color is None:
@@ -608,24 +820,24 @@ class Toolbar:
         else:
             glColor3f(1.0, 1.0, 1.0)
 
-        self._draw_rect(x, y, w, h)
+        self._draw_rounded_rect(x, y, w, h, 4)
 
         glColor3f(0.75, 0.75, 0.75)
-        self._draw_border(x, y, w, h)
+        self._draw_rounded_border(x, y, w, h, 4)
 
         color = (255, 255, 255) if active else (30, 30, 30)
         self._draw_text_custom_color(text, x + w / 2 - 20, y + 7, self.font, color)
 
     def _draw_input_box(self, x, y, w, h, text, active=False):
         glColor3f(1.0, 1.0, 1.0)
-        self._draw_rect(x, y, w, h)
+        self._draw_rounded_rect(x, y, w, h, 4)
 
         if active:
             glColor3f(0.0, 0.45, 0.5)
         else:
             glColor3f(0.82, 0.82, 0.82)
 
-        self._draw_border(x, y, w, h)
+        self._draw_rounded_border(x, y, w, h, 4)
         self._draw_text(text, x + 8, y + 6, self.font)
 
     def _draw_shadow(self, x, y, w, h):
@@ -656,6 +868,43 @@ class Toolbar:
         glVertex2f(x, y + h)
         glEnd()
 
+    def _rounded_rect_points(self, x, y, w, h, radius, segments=6):
+        r = max(0.0, min(float(radius), w / 2.0, h / 2.0))
+
+        if r == 0:
+            return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+
+        points = []
+        corner_data = [
+            (x + w - r, y + r, -1.5707963, 0.0),
+            (x + w - r, y + h - r, 0.0, 1.5707963),
+            (x + r, y + h - r, 1.5707963, 3.1415926),
+            (x + r, y + r, 3.1415926, 4.7123890),
+        ]
+
+        for cx, cy, start_a, end_a in corner_data:
+            for i in range(segments + 1):
+                t = i / segments
+                a = start_a + (end_a - start_a) * t
+                points.append((cx + r * pygame.math.Vector2(1, 0).rotate_rad(a).x,
+                               cy + r * pygame.math.Vector2(1, 0).rotate_rad(a).y))
+
+        return points
+
+    def _draw_rounded_rect(self, x, y, w, h, radius):
+        points = self._rounded_rect_points(x, y, w, h, radius)
+        glBegin(GL_POLYGON)
+        for px, py in points:
+            glVertex2f(px, py)
+        glEnd()
+
+    def _draw_rounded_border(self, x, y, w, h, radius):
+        points = self._rounded_rect_points(x, y, w, h, radius)
+        glBegin(GL_LINE_LOOP)
+        for px, py in points:
+            glVertex2f(px, py)
+        glEnd()
+
     def _draw_circle(self, cx, cy, radius, fill=True):
         if fill:
             glBegin(GL_TRIANGLE_FAN)
@@ -675,6 +924,10 @@ class Toolbar:
 
     def _draw_text_custom_color(self, text, x, y, font, color):
         surface = font.render(text, True, color, None)
+
+        self._draw_surface(surface, x, y)
+
+    def _draw_surface(self, surface, x, y):
         text_data = pygame.image.tostring(surface, "RGBA", True)
 
         glEnable(GL_BLEND)
