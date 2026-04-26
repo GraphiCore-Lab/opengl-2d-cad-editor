@@ -68,6 +68,21 @@ class BaseShape:
         bx, by, bw, bh = self.get_bounds()
         return bx <= x <= bx + bw and by <= y <= by + bh
 
+    def is_on_selection_border(self, x, y, thickness=8):
+        bx, by, bw, bh = self.get_bounds()
+
+        outer = (
+            (bx - thickness) <= x <= (bx + bw + thickness)
+            and (by - thickness) <= y <= (by + bh + thickness)
+        )
+
+        inner = (
+            (bx + thickness) <= x <= (bx + bw - thickness)
+            and (by + thickness) <= y <= (by + bh - thickness)
+        )
+
+        return outer and not inner
+
     def get_center(self):
         x, y, w, h = self.get_bounds()
         return x + w / 2, y + h / 2

@@ -20,6 +20,8 @@ class PropertiesPanel:
             {"name": "send_back", "label": "Send Back", "x": self.x + 20, "y": self.y + 380, "w": 170, "h": 30},
             {"name": "duplicate", "label": "Duplicate", "x": self.x + 20, "y": self.y + 420, "w": 170, "h": 30},
             {"name": "delete", "label": "Delete", "x": self.x + 20, "y": self.y + 460, "w": 170, "h": 30},
+
+            {"name": "save_artwork", "label": "Save this Artwork!", "x": self.x + 20, "y": self.y + self.height - 52, "w": 170, "h": 34},
         ]
 
         pygame.font.init()
@@ -47,14 +49,19 @@ class PropertiesPanel:
             self._draw_text("Object selected", self.x + 20, self.y + 45, self.font)
 
         for button in self.buttons:
-            if selected_shape is None:
+            if button["name"] == "save_artwork":
+                glColor3f(0.78, 0.92, 0.82)
+            elif selected_shape is None:
                 glColor3f(0.88, 0.88, 0.88)
             else:
                 glColor3f(0.985, 0.985, 0.985)
 
             self._draw_rounded_rect(button["x"], button["y"], button["w"], button["h"], 4)
 
-            glColor3f(0.72, 0.72, 0.72)
+            if button["name"] == "save_artwork":
+                glColor3f(0.22, 0.5, 0.32)
+            else:
+                glColor3f(0.72, 0.72, 0.72)
             self._draw_rounded_border(button["x"], button["y"], button["w"], button["h"], 4)
 
             icon = self.icons.get(button["name"])
@@ -65,7 +72,16 @@ class PropertiesPanel:
                 icon_y = button["y"] + (button["h"] - icon.get_height()) / 2
                 self._draw_surface(icon, icon_x, icon_y)
 
-            self._draw_text(button["label"], text_x, button["y"] + 7, self.font)
+            label_y = button["y"] + (9 if button["name"] == "save_artwork" else 7)
+            self._draw_text(button["label"], text_x, label_y, self.font)
+
+        # Separate save action from edit tools visually.
+        sep_y = self.y + self.height - 66
+        glColor3f(0.75, 0.75, 0.75)
+        glBegin(GL_LINES)
+        glVertex2f(self.x + 16, sep_y)
+        glVertex2f(self.x + self.width - 16, sep_y)
+        glEnd()
 
     def handle_click(self, x, y):
         for button in self.buttons:

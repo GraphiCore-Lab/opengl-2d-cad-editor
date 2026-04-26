@@ -69,11 +69,27 @@ class Toolbar:
         self.input_text = ""
         self.hovered_button = None
 
+        self.basic_colors = [
+            (0.96, 0.45, 0.45), (1.0, 0.15, 0.1), (0.45, 0.25, 0.25),
+            (0.55, 0.22, 0.18), (0.25, 0.02, 0.0), (0.45, 0.9, 0.9),
+            (0.3, 0.85, 0.85), (0.1, 0.45, 0.9), (0.0, 0.1, 0.9),
+            (1.0, 1.0, 0.45), (1.0, 1.0, 0.1), (0.95, 0.55, 0.25),
+            (0.95, 0.42, 0.2), (0.5, 0.25, 0.05), (0.45, 1.0, 0.45),
+            (0.9, 0.35, 0.65), (0.85, 0.35, 0.9), (1.0, 1.0, 1.0),
+        ]
+        self.custom_colors = [None] * 12
+        self.selected_custom_slot = None
+
         pygame.font.init()
         self.font, self.title_font, self.small_font = load_ui_fonts(
             body_size=12,
             title_size=22,
             small_size=11,
+        )
+        self.picker_font, self.picker_title_font, self.picker_small_font = load_ui_fonts(
+            body_size=14,
+            title_size=26,
+            small_size=13,
         )
 
         self.icon_size = 24
@@ -213,6 +229,24 @@ class Toolbar:
 
             return None
 
+        basic_index = self._get_clicked_basic_color_index(x, y)
+        if basic_index is not None:
+            self.selected_color = self.basic_colors[basic_index]
+            self._sync_hsv_from_rgb()
+            return self._color_action()
+
+        custom_index = self._get_clicked_custom_color_index(x, y)
+        if custom_index is not None:
+            self.selected_custom_slot = custom_index
+
+            saved = self.custom_colors[custom_index]
+            if saved is not None:
+                self.selected_color = saved
+                self._sync_hsv_from_rgb()
+                return self._color_action()
+
+            return None
+
         if self._point_in_rect(x, y, self.gradient_x, self.gradient_y, self.gradient_w, self.gradient_h):
             self.active_input = None
             self.input_text = ""
@@ -249,6 +283,9 @@ class Toolbar:
         }
 
         if self._inside(ok_button, x, y):
+            if self.selected_custom_slot is not None:
+                self.custom_colors[self.selected_custom_slot] = self.selected_color
+
             self.color_picker_open = False
             self.active_input = None
             self.input_text = ""
@@ -354,8 +391,8 @@ class Toolbar:
         glColor3f(0.68, 0.68, 0.68)
         self._draw_border(self.picker_x, self.picker_y, self.picker_w, self.picker_h)
 
-        self._draw_text("Edit colors", self.picker_x + 25, self.picker_y + 35, self.title_font)
-        self._draw_text("×", self.picker_x + self.picker_w - 28, self.picker_y + 13, self.font)
+        self._draw_text("Edit colors", self.picker_x + 25, self.picker_y + 34, self.picker_title_font)
+        self._draw_text("×", self.picker_x + self.picker_w - 28, self.picker_y + 13, self.picker_font)
 
         self._draw_gradient_area()
         self._draw_value_slider()
@@ -513,7 +550,7 @@ class Toolbar:
                 active=self.active_input == key
             )
 
-            self._draw_text(labels[key], box["x"] + 105, box["y"] + 7, self.font)
+            self._draw_text(labels[key], box["x"] + 105, box["y"] + 7, self.picker_font)
 
     def _get_input_boxes(self):
         hex_x = self.value_x + 155
@@ -537,54 +574,88 @@ class Toolbar:
         return None
 
     def _draw_basic_color_dots(self):
-        self._draw_text("Basic colors", self.picker_x + 25, self.picker_y + 320, self.small_font)
+        self._draw_text("Basic colors", self.picker_x + 25, self.picker_y + 332, self.picker_small_font)
 
-        colors = [
-            (0.96, 0.45, 0.45), (1.0, 0.15, 0.1), (0.45, 0.25, 0.25),
-            (0.55, 0.22, 0.18), (0.25, 0.02, 0.0), (0.45, 0.9, 0.9),
-            (0.3, 0.85, 0.85), (0.1, 0.45, 0.9), (0.0, 0.1, 0.9),
-
-            (1.0, 1.0, 0.45), (1.0, 1.0, 0.1), (0.95, 0.55, 0.25),
-            (0.95, 0.42, 0.2), (0.5, 0.25, 0.05), (0.45, 1.0, 0.45),
-            (0.9, 0.35, 0.65), (0.85, 0.35, 0.9), (1.0, 1.0, 1.0),
-        ]
-
-        start_x = self.picker_x + 25
-        start_y = self.picker_y + 345
-        size = 17
-        gap = 10
-
-        for i, color in enumerate(colors):
-            col = i % 9
-            row = i // 9
-
-            cx = start_x + col * (size + gap)
-            cy = start_y + row * (size + gap)
+        for i, dot in enumerate(self._basic_color_dots()):
+            color = self.basic_colors[i]
+            cx, cy, radius = dot["cx"], dot["cy"], dot["radius"]
 
             glColor3f(*color)
-            self._draw_circle(cx + size / 2, cy + size / 2, size / 2, fill=True)
+            self._draw_circle(cx, cy, radius, fill=True)
 
             glColor3f(0.45, 0.45, 0.45)
-            self._draw_circle(cx + size / 2, cy + size / 2, size / 2, fill=False)
+            self._draw_circle(cx, cy, radius, fill=False)
 
     def _draw_custom_color_dots(self):
-        self._draw_text("Custom colors", self.picker_x + 375, self.picker_y + 320, self.small_font)
+        self._draw_text("Custom colors", self.picker_x + 375, self.picker_y + 332, self.picker_small_font)
 
-        start_x = self.picker_x + 375
-        start_y = self.picker_y + 345
+        for i, dot in enumerate(self._custom_color_dots()):
+            cx, cy, radius = dot["cx"], dot["cy"], dot["radius"]
+            saved = self.custom_colors[i]
+
+            if saved is None:
+                glColor3f(1.0, 1.0, 1.0)
+            else:
+                glColor3f(*saved)
+
+            self._draw_circle(cx, cy, radius, fill=True)
+
+            if i == self.selected_custom_slot:
+                glColor3f(0.0, 0.45, 0.5)
+                self._draw_circle(cx, cy, radius + 2, fill=False)
+
+            glColor3f(0.65, 0.65, 0.65)
+            self._draw_circle(cx, cy, radius, fill=False)
+
+    def _basic_color_dots(self):
+        start_x = self.picker_x + 25
+        start_y = self.picker_y + 360
         size = 17
         gap = 10
+        dots = []
 
-        for row in range(2):
-            for col in range(6):
-                cx = start_x + col * (size + gap)
-                cy = start_y + row * (size + gap)
+        for i in range(18):
+            col = i % 9
+            row = i // 9
+            cx = start_x + col * (size + gap) + size / 2
+            cy = start_y + row * (size + gap) + size / 2
+            dots.append({"cx": cx, "cy": cy, "radius": size / 2})
 
-                glColor3f(1.0, 1.0, 1.0)
-                self._draw_circle(cx + size / 2, cy + size / 2, size / 2, fill=True)
+        return dots
 
-                glColor3f(0.65, 0.65, 0.65)
-                self._draw_circle(cx + size / 2, cy + size / 2, size / 2, fill=False)
+    def _custom_color_dots(self):
+        start_x = self.picker_x + 375
+        start_y = self.picker_y + 360
+        size = 17
+        gap = 10
+        dots = []
+
+        for i in range(12):
+            col = i % 6
+            row = i // 6
+            cx = start_x + col * (size + gap) + size / 2
+            cy = start_y + row * (size + gap) + size / 2
+            dots.append({"cx": cx, "cy": cy, "radius": size / 2})
+
+        return dots
+
+    def _get_clicked_basic_color_index(self, x, y):
+        for i, dot in enumerate(self._basic_color_dots()):
+            dx = x - dot["cx"]
+            dy = y - dot["cy"]
+            if dx * dx + dy * dy <= (dot["radius"] + 2) ** 2:
+                return i
+
+        return None
+
+    def _get_clicked_custom_color_index(self, x, y):
+        for i, dot in enumerate(self._custom_color_dots()):
+            dx = x - dot["cx"]
+            dy = y - dot["cy"]
+            if dx * dx + dy * dy <= (dot["radius"] + 2) ** 2:
+                return i
+
+        return None
 
     def _draw_toolbar_background(self):
         glColor3f(0.96, 0.96, 0.96)
@@ -826,7 +897,7 @@ class Toolbar:
         self._draw_rounded_border(x, y, w, h, 4)
 
         color = (255, 255, 255) if active else (30, 30, 30)
-        self._draw_text_custom_color(text, x + w / 2 - 20, y + 7, self.font, color)
+        self._draw_text_custom_color(text, x + w / 2 - 20, y + 7, self.picker_font, color)
 
     def _draw_input_box(self, x, y, w, h, text, active=False):
         glColor3f(1.0, 1.0, 1.0)
@@ -838,7 +909,7 @@ class Toolbar:
             glColor3f(0.82, 0.82, 0.82)
 
         self._draw_rounded_border(x, y, w, h, 4)
-        self._draw_text(text, x + 8, y + 6, self.font)
+        self._draw_text(text, x + 8, y + 6, self.picker_font)
 
     def _draw_shadow(self, x, y, w, h):
         glEnable(GL_BLEND)
