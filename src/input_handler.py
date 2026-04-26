@@ -47,6 +47,28 @@ class InputHandler:
         self._scaling = False
         self._transform_last = (0, 0)
 
+        self._last_click_time = 0
+        self._last_click_pos = None
+
+        self.action_hints = {
+            "select": "Click on the object you want to select",
+            "move": "Click and drag to move the selected object",
+            "rotate": "Click and drag horizontally to rotate the selected object",
+            "scale": "Click and drag vertically to scale the selected object",
+            "line": "Create a line",
+            "rect": "Create a rectangle",
+            "circle": "Create a circle",
+            "triangle": "Create a triangle",
+
+            "fill_toggle": "Click to enable or disable fill for the selected object",
+            "line_width": "Adjust line width of the selected object",
+            "bring_front": "Bring the selected object to the front",
+            "send_back": "Send the selected object to the back",
+            "duplicate": "Duplicate the selected object",
+            "delete": "Delete the selected object",
+            "save_artwork": "Open Save As to export JSON or PNG",
+        }
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
             self._on_mouse_down(event)
@@ -79,6 +101,9 @@ class InputHandler:
 
     def get_preview(self):
         return self._preview
+
+    def is_rotation_active(self):
+        return self._rotating and self.scene.selected is not None
 
     def _reset_action_states(self):
         self._moving = False
@@ -122,6 +147,28 @@ class InputHandler:
         real_x = mx + CANVAS_X
         real_y = my
 
+        if self._is_double_click(event, real_x, real_y):
+            self.scene.select_at(real_x, real_y)
+            self._reset_action_states()
+            return
+
+        # Selection overlay interactions always take precedence when a shape is selected,
+        # even if the current tool is a drawing tool.
+        if self.scene.selected:
+            selected = self.scene.selected
+
+            if hasattr(selected, "is_on_rotate_handle") and selected.is_on_rotate_handle(real_x, real_y):
+                self._reset_action_states()
+                self._rotating = True
+                self._transform_last = (real_x, real_y)
+                return
+
+            if hasattr(selected, "is_on_selection_border") and selected.is_on_selection_border(real_x, real_y):
+                self._reset_action_states()
+                self._scaling = True
+                self._transform_last = (real_x, real_y)
+                return
+
         if self.current_tool in (TOOL_SELECT, TOOL_MOVE):
             selected = self.scene.select_at(real_x, real_y)
 
@@ -155,6 +202,28 @@ class InputHandler:
             self._drawing = True
             self._start_x = real_x
             self._start_y = real_y
+
+    def _is_double_click(self, event, x, y):
+        clicks = getattr(event, "clicks", 0)
+
+        if clicks >= 2:
+            return True
+
+        now = pygame.time.get_ticks()
+
+        if self._last_click_pos is None:
+            self._last_click_time = now
+            self._last_click_pos = (x, y)
+            return False
+
+        last_x, last_y = self._last_click_pos
+        dt = now - self._last_click_time
+        dist_sq = (x - last_x) ** 2 + (y - last_y) ** 2
+
+        self._last_click_time = now
+        self._last_click_pos = (x, y)
+
+        return dt <= 320 and dist_sq <= 14 * 14
 
     def _on_mouse_move(self, event):
         # Edit colors popup açıkken arkadaki shape çizim/taşıma/scale/rotate çalışmasın
@@ -250,6 +319,7 @@ class InputHandler:
 
         self.current_tool = action
         self._reset_action_states()
+        self._show_action_hint(action)
 
     def _parse_rgb_action(self, action):
         values = action.split(":")[1]
@@ -258,6 +328,12 @@ class InputHandler:
         return float(r), float(g), float(b)
 
     def _handle_panel_action(self, action):
+        if action == "save_artwork":
+            from src.utils.file_ops import save_artwork_dialog
+            result = save_artwork_dialog(self.scene)
+            self._show_save_result_hint(result)
+            return
+
         selected = self.scene.selected
 
         if selected is None:
@@ -270,7 +346,7 @@ class InputHandler:
         elif action == "line_width":
             selected.line_width += 1
 
-            if selected.line_width > 6:
+            if selected.line_width > 12:
                 selected.line_width = 1
 
             self.current_line_width = selected.line_width
@@ -300,6 +376,37 @@ class InputHandler:
 
         elif action == "delete":
             self.scene.delete_selected()
+
+        self._show_action_hint(action)
+
+    def _show_action_hint(self, action):
+        if not self.status_bar:
+            return
+
+        hint = self.action_hints.get(action)
+
+        if hint:
+            self.status_bar.show_hint(hint)
+
+    def _show_save_result_hint(self, result):
+        if not self.status_bar:
+            return
+
+        if not result:
+            self.status_bar.show_hint("Save cancelled")
+            return
+
+        status = result.get("status")
+        path = result.get("path")
+        message = result.get("message") or "Save finished"
+
+        if status == "saved" and path:
+            import os
+            self.status_bar.show_hint(f"Saved: {os.path.basename(path)}")
+        elif status == "cancelled":
+            self.status_bar.show_hint("Save cancelled")
+        else:
+            self.status_bar.show_hint(f"Save failed: {message}")
 
     def _on_key(self, event):
         mods = pygame.key.get_mods()
@@ -335,8 +442,9 @@ class InputHandler:
                 self.scene.duplicate(self.scene.selected)
 
         elif ctrl and event.key == pygame.K_s:
-            from src.utils.file_ops import save_scene
-            save_scene(self.scene)
+            from src.utils.file_ops import save_artwork_dialog
+            result = save_artwork_dialog(self.scene)
+            self._show_save_result_hint(result)
 
         elif ctrl and event.key == pygame.K_o:
             from src.utils.file_ops import load_scene

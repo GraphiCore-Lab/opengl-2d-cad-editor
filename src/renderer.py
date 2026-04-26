@@ -4,6 +4,7 @@ Kişi 1 + UI entegrasyonu (Kişi 3 uyumlu)
 """
 
 from OpenGL.GL import *
+import math
 
 from src.utils.constants import (
     CANVAS_X, CANVAS_W, CANVAS_H,
@@ -125,3 +126,27 @@ class Renderer:
         shape.draw()
 
         glDisable(GL_BLEND)
+
+    def draw_rotation_pivot(self, shape):
+        if shape is None:
+            return
+
+        cx, cy = shape.get_center()
+
+        glColor3f(0.0, 0.7, 1.0)
+        glLineWidth(2.0)
+
+        glBegin(GL_LINES)
+        glVertex2f(cx - 8, cy)
+        glVertex2f(cx + 8, cy)
+        glVertex2f(cx, cy - 8)
+        glVertex2f(cx, cy + 8)
+        glEnd()
+
+        glBegin(GL_LINE_LOOP)
+        for i in range(24):
+            angle = 2 * 3.14159 * i / 24
+            glVertex2f(cx + 5 * math.cos(angle), cy + 5 * math.sin(angle))
+        glEnd()
+
+        glLineWidth(1.0)

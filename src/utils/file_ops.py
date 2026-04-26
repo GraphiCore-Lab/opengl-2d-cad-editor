@@ -4,8 +4,21 @@ Kişi 3'ün dosyası.
 """
 import json
 import os
+import tkinter as tk
+from tkinter import filedialog
 
-from src.utils.constants import DEFAULT_SAVE_PATH
+import pygame
+from OpenGL.GL import glReadPixels, GL_RGBA, GL_UNSIGNED_BYTE
+
+from src.utils.constants import (
+    DEFAULT_SAVE_PATH,
+    WIDTH,
+    HEIGHT,
+    CANVAS_X,
+    CANVAS_W,
+    TOOLBAR_HEIGHT,
+    STATUS_BAR_HEIGHT,
+)
 from src.shapes.line import Line
 from src.shapes.rectangle import Rectangle
 from src.shapes.circle import Circle
@@ -42,9 +55,98 @@ def save_scene(scene, path=DEFAULT_SAVE_PATH):
             json.dump(scene.to_dict(), file, indent=2)
 
         print(f"[save] {path}")
+        return True, None
 
     except Exception as error:
         print(f"[save ERROR] {error}")
+        return False, str(error)
+
+
+def save_artwork_dialog(scene):
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        path = filedialog.asksaveasfilename(
+            title="Save this Artwork",
+            defaultextension=".json",
+            initialfile="scene.json",
+            filetypes=[
+                ("JSON Scene", "*.json"),
+                ("PNG Image", "*.png"),
+            ],
+        )
+    finally:
+        root.destroy()
+
+    if not path:
+        return {
+            "status": "cancelled",
+            "path": None,
+            "message": "Save cancelled",
+        }
+
+    ext = os.path.splitext(path)[1].lower()
+
+    if ext == ".png":
+        ok, error = save_artwork_png(path)
+        if ok:
+            return {
+                "status": "saved",
+                "path": path,
+                "message": "Saved artwork as PNG",
+            }
+        return {
+            "status": "error",
+            "path": None,
+            "message": error or "Failed to save PNG",
+        }
+
+    if ext == "":
+        path = f"{path}.json"
+
+    ok, error = save_scene(scene, path)
+    if ok:
+        return {
+            "status": "saved",
+            "path": path,
+            "message": "Saved scene as JSON",
+        }
+
+    return {
+        "status": "error",
+        "path": None,
+        "message": error or "Failed to save JSON",
+    }
+
+
+def save_artwork_png(path):
+    try:
+        surface = pygame.display.get_surface()
+        if surface is None:
+            raise RuntimeError("No active display surface")
+
+        frame_bytes = glReadPixels(0, 0, WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE)
+        frame = pygame.image.fromstring(frame_bytes, (WIDTH, HEIGHT), "RGBA", True)
+
+        artwork_h = HEIGHT - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT
+        crop_rect = pygame.Rect(CANVAS_X, TOOLBAR_HEIGHT, CANVAS_W, artwork_h)
+        crop_rect = crop_rect.clip(frame.get_rect())
+
+        artwork = pygame.Surface((crop_rect.width, crop_rect.height), pygame.SRCALPHA)
+        artwork.blit(frame, (0, 0), crop_rect)
+
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+
+        pygame.image.save(artwork, path)
+        print(f"[save png] {path}")
+        return True, None
+
+    except Exception as error:
+        print(f"[save PNG ERROR] {error}")
+        return False, str(error)
 
 
 def load_scene(scene, path=DEFAULT_SAVE_PATH):

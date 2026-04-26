@@ -75,6 +75,12 @@ def run():
         if preview:
             renderer.draw_preview(preview)
 
+        if input_handler.is_rotation_active() and scene.selected:
+            renderer.draw_rotation_pivot(scene.selected)
+
+        # UI çiziminden önce global line width state'ini sıfırla.
+        glLineWidth(1.0)
+
         toolbar.draw(
             input_handler.current_tool,
             input_handler.current_outline_color,
