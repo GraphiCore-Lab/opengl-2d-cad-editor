@@ -15,6 +15,7 @@ class BaseShape:
         self.fill_color = (0.6, 0.6, 0.6)
         self.fill = True
         self.line_width = 2.0
+        self.alpha = 1.0
         self.selected = False
         self.transform = np.identity(3, dtype=float)
 
@@ -146,6 +147,7 @@ class BaseShape:
             "fill_color": list(self.fill_color),
             "fill": self.fill,
             "line_width": self.line_width,
+            "alpha": self.alpha,
             "transform": self.transform.tolist(),
         }
 
@@ -154,7 +156,7 @@ class BaseShape:
         self.fill_color = tuple(data.get("fill_color", data.get("color", (0.6, 0.6, 0.6))))
         self.fill = data.get("fill", True)
         self.line_width = data.get("line_width", 2.0)
-
+        self.alpha = data.get("alpha", 1.0)
         if "transform" in data:
             self.transform = np.array(data["transform"], dtype=float)
 
