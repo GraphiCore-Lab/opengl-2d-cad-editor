@@ -34,6 +34,12 @@ class PropertiesPanel:
         self.icon_size = 24
         self.icons = self._load_panel_icons()
 
+        self.alpha_slider_x = self.x + 20
+        self.alpha_slider_y = self.y + 165  
+        self.alpha_slider_w = 170
+        self.alpha_slider_h = 6
+        self.is_dragging_alpha = False
+
     def draw(self, selected_shape):
         glColor3f(0.96, 0.96, 0.96)
         self._draw_rect(self.x, self.y, self.width, self.height)
@@ -75,6 +81,30 @@ class PropertiesPanel:
             label_y = button["y"] + (9 if button["name"] == "save_artwork" else 7)
             self._draw_text(button["label"], text_x, label_y, self.font)
 
+        self._draw_text("Opacity", self.alpha_slider_x, self.alpha_slider_y - 20, self.font)
+        
+        glColor3f(0.8, 0.8, 0.8)
+        self._draw_rounded_rect(self.alpha_slider_x, self.alpha_slider_y, self.alpha_slider_w, self.alpha_slider_h, 3) 
+        
+        current_alpha = 1.0
+        if selected_shape and hasattr(selected_shape, "alpha"):
+            current_alpha = selected_shape.alpha
+        
+        glColor3f(0.4, 0.6, 0.8) # Blue-ish fill
+        active_w = self.alpha_slider_w * current_alpha
+        if active_w > 0:
+            self._draw_rounded_rect(self.alpha_slider_x, self.alpha_slider_y, active_w, self.alpha_slider_h, 3)
+        
+        thumb_w = 12
+        thumb_h = 16
+        thumb_rect_x = self.alpha_slider_x + active_w - (thumb_w / 2)
+        thumb_rect_y = self.alpha_slider_y - (thumb_h - self.alpha_slider_h) / 2
+        
+        glColor3f(1.0, 1.0, 1.0)
+        self._draw_rounded_rect(thumb_rect_x, thumb_rect_y, thumb_w, thumb_h, 3)
+        glColor3f(0.5, 0.5, 0.5)
+        self._draw_rounded_border(thumb_rect_x, thumb_rect_y, thumb_w, thumb_h, 3)
+
         # Separate save action from edit tools visually.
         sep_y = self.y + self.height - 66
         glColor3f(0.75, 0.75, 0.75)
@@ -88,6 +118,13 @@ class PropertiesPanel:
             if button["x"] <= x <= button["x"] + button["w"] and button["y"] <= y <= button["y"] + button["h"]:
                 return button["name"]
 
+        pad = 10
+        if (self.alpha_slider_x - pad <= x <= self.alpha_slider_x + self.alpha_slider_w + pad and 
+            self.alpha_slider_y - pad <= y <= self.alpha_slider_y + self.alpha_slider_h + pad):
+            
+            self.is_dragging_alpha = True
+            return self._calc_alpha_action(x)
+        
         return None
 
     def _draw_rect(self, x, y, w, h):
@@ -183,6 +220,19 @@ class PropertiesPanel:
     def _draw_text(self, text, x, y, font):
         surface = font.render(text, True, (30, 30, 30), None)
         self._draw_surface(surface, x, y)
+
+    def _calc_alpha_action(self, x):
+        clamped_x = max(self.alpha_slider_x, min(x, self.alpha_slider_x + self.alpha_slider_w))
+        alpha_val = (clamped_x - self.alpha_slider_x) / self.alpha_slider_w
+        return f"selected_alpha:{alpha_val:.2f}"
+
+    def handle_mouse_motion(self, x, y):
+        if getattr(self, "is_dragging_alpha", False):
+            return self._calc_alpha_action(x)
+        return None
+
+    def handle_mouse_up(self):
+        self.is_dragging_alpha = False
 
     def _draw_surface(self, surface, x, y):
         text_data = pygame.image.tostring(surface, "RGBA", True)

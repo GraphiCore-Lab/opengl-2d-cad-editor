@@ -16,24 +16,44 @@ class Toolbar:
             {"name": "rotate", "label": "Rotate", "x": 164, "y": 12, "w": 72, "h": 32},
             {"name": "scale", "label": "Scale", "x": 240, "y": 12, "w": 72, "h": 32},
 
-            {"name": "line", "label": "Line", "x": 330, "y": 12, "w": 72, "h": 32},
-            {"name": "rect", "label": "Rect", "x": 406, "y": 12, "w": 72, "h": 32},
-            {"name": "circle", "label": "Circle", "x": 482, "y": 12, "w": 72, "h": 32},
-            {"name": "triangle", "label": "Tri", "x": 558, "y": 12, "w": 72, "h": 32},
+            {"name": "line", "label": "Line", "x": 326, "y": 12, "w": 58, "h": 32},
+            {"name": "rect", "label": "Rect", "x": 388, "y": 12, "w": 58, "h": 32},
+            {"name": "circle", "label": "Circle", "x": 450, "y": 12, "w": 58, "h": 32},
+            {"name": "triangle", "label": "Tri", "x": 512, "y": 12, "w": 58, "h": 32},
+            {"name": "shape_dropdown", "label": "Extras", "x": 574, "y": 12, "w": 58, "h": 32},
+        ]
+
+        self.shape_dropdown_open = False
+        self.dropdown_hovered_item = None
+        self.dropdown_items = [
+            {"name": "ellipse", "label": "Ellipse"},
+            {"name": "polygon", "label": "Polygon"},
+            {"name": "star", "label": "Star"},
         ]
 
         self.stroke_min = 1
         self.stroke_mid = 6
         self.stroke_max = 12
         self.dragging_stroke_slider = False
-        self.stroke_slider_rect = {"x": 648, "y": 18, "w": 220, "h": 18}
+        self.stroke_slider_rect = {"x": 650, "y": 18, "w": 200, "h": 18}
+
+        self.active_line_style = "solid"
+        
+        style_base_x = 680  
+        style_base_y = 52  
+        
+        self.style_buttons = [
+            {"id": "solid", "label": "Solid", "x": style_base_x, "y": style_base_y, "w": 55, "h": 20},
+            {"id": "dashed", "label": "Dash", "x": style_base_x + 65, "y": style_base_y, "w": 55, "h": 20},
+            {"id": "dotted", "label": "Dot", "x": style_base_x + 130, "y": style_base_y, "w": 55, "h": 20}
+        ]
 
         self.color_target = "outline"
 
         self.color_buttons = [
-            {"name": "target:outline", "label": "Outline", "x": 910, "y": 12, "w": 86, "h": 32},
-            {"name": "target:fill", "label": "Fill", "x": 1004, "y": 12, "w": 86, "h": 32},
-            {"name": "open_color_picker", "label": "Edit colors", "x": 1098, "y": 12, "w": 96, "h": 32},
+            {"name": "target:outline", "label": "Outline", "x": 916, "y": 12, "w": 86, "h": 32},
+            {"name": "target:fill", "label": "Fill", "x": 1010, "y": 12, "w": 86, "h": 32},
+            {"name": "open_color_picker", "label": "Edit colors", "x": 1104, "y": 12, "w": 96, "h": 32},
         ]
 
         self.color_picker_open = False
@@ -98,10 +118,10 @@ class Toolbar:
     def draw(self, active_tool, current_outline=None, current_fill=None, line_width=2):
         self._draw_toolbar_background()
 
-        self._draw_group_title("Tools", 12, 72)
-        self._draw_group_title("Shapes", 330, 72)
-        self._draw_group_title("Size", 648, 72)
-        self._draw_group_title("Colors", 910, 72)
+        self._draw_group_title("Tools", 12, 74)
+        self._draw_group_title("Shapes", 330, 74)
+        self._draw_group_title("Size & Style", 680, 74)
+        self._draw_group_title("Colors", 930, 74)
 
         for button in self.buttons:
             active = button["name"] == active_tool
@@ -110,6 +130,27 @@ class Toolbar:
             self._draw_button(button, active, hovered=hovered)
 
         self._draw_stroke_slider(line_width)
+
+        for btn in self.style_buttons:
+            is_active = self.active_line_style == btn["id"]
+
+            if is_active:
+                glColor3f(0.72, 0.86, 1.0) # Light blue 
+            else:
+                glColor3f(0.985, 0.985, 0.985) # White/gray
+                
+            self._draw_rounded_rect(btn["x"], btn["y"], btn["w"], btn["h"], 3)
+
+            if is_active:
+                glColor3f(0.1, 0.45, 0.8) 
+            else:
+                glColor3f(0.72, 0.72, 0.72)
+                
+            self._draw_rounded_border(btn["x"], btn["y"], btn["w"], btn["h"], 3)
+
+            text_x = btn["x"] + 10
+            text_y = btn["y"] + 6
+            self._draw_text(btn["label"], text_x, text_y, self.small_font)
 
         for button in self.color_buttons:
             active = button["name"] == f"target:{self.color_target}"
@@ -124,20 +165,70 @@ class Toolbar:
             self._draw_button(button, active, hovered=hovered, indicator_color=indicator_color)
 
     def draw_overlay(self):
+        if self.shape_dropdown_open:
+            self._draw_shape_dropdown()
+
         if self.color_picker_open:
             self._draw_color_picker()
+
+    def _draw_shape_dropdown(self):
+        dd_x = 574 
+        dd_y = 46  
+        item_h = 30
+        dd_w = 90
+        dd_h = len(self.dropdown_items) * item_h
+
+        self._draw_shadow(dd_x, dd_y, dd_w, dd_h)
+
+        glColor3f(0.98, 0.98, 0.98)
+        self._draw_rect(dd_x, dd_y, dd_w, dd_h)
+        glColor3f(0.75, 0.75, 0.75)
+        self._draw_border(dd_x, dd_y, dd_w, dd_h)
+
+        for i, item in enumerate(self.dropdown_items):
+            item_y = dd_y + i * item_h
+            
+            if self.dropdown_hovered_item == item["name"]:
+                glColor3f(0.85, 0.9, 0.95) # Light blue highlight
+                self._draw_rect(dd_x + 1, item_y + 1, dd_w - 2, item_h - 2)
+
+            self._draw_text(item["label"], dd_x + 10, item_y + 8, self.font)
 
     def handle_click(self, x, y):
         if self.color_picker_open:
             return self._handle_color_picker_click(x, y)
+        
+        if self.shape_dropdown_open:
+            dd_x, dd_y, item_h, dd_w = 574, 46, 30, 90
+            dd_h = len(self.dropdown_items) * item_h
+
+            if self._point_in_rect(x, y, dd_x, dd_y, dd_w, dd_h):
+                rel_y = y - dd_y
+                index = int(rel_y // item_h)
+
+                if 0 <= index < len(self.dropdown_items):
+                    self.shape_dropdown_open = False
+                    return self.dropdown_items[index]["name"] 
+                
+            self.shape_dropdown_open = False
+            return None
 
         if self._inside(self.stroke_slider_rect, x, y):
             self.dragging_stroke_slider = True
             width = self._width_from_slider_x(x)
             return f"width:{width}"
+        
+        for btn in self.style_buttons:
+            if self._inside(btn, x, y):
+                self.active_line_style = btn["id"]
+                return f"current_line_style:{btn['id']}"
 
         for button in self.buttons:
             if self._inside(button, x, y):
+                if button["name"] == "shape_dropdown":
+                    self.shape_dropdown_open = True
+                    return None
+                
                 return button["name"]
 
         for button in self.color_buttons:
@@ -175,6 +266,19 @@ class Toolbar:
 
         if self.dragging_value:
             self._select_from_value_slider(y)
+            return None
+
+        if self.shape_dropdown_open:
+            dd_x, dd_y, item_h, dd_w = 574, 46, 30, 90
+            dd_h = len(self.dropdown_items) * item_h
+            self.dropdown_hovered_item = None
+            
+            if self._point_in_rect(x, y, dd_x, dd_y, dd_w, dd_h):
+                rel_y = y - dd_y
+                index = int(rel_y // item_h)
+                if 0 <= index < len(self.dropdown_items):
+                    self.dropdown_hovered_item = self.dropdown_items[index]["name"]
+            
             return None
 
         return None

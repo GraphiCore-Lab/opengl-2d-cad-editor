@@ -35,6 +35,9 @@ def init_opengl():
     glEnable(GL_LINE_SMOOTH)
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
 
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
 
 def run():
     pygame.init()
@@ -96,6 +99,12 @@ def run():
         # Color picker her şeyin üstünde görünsün
         toolbar.draw_overlay()
 
+        # --- DYNAMIC INPUT UI ---
+        if input_handler.current_tool == "polygon" and hasattr(input_handler, "polygon_input_string"):
+            renderer.draw_dynamic_input("polygon", input_handler.polygon_input_string)
+        elif input_handler.current_tool == "star" and hasattr(input_handler, "star_input_string"):
+            renderer.draw_dynamic_input("star", input_handler.star_input_string)
+
         pygame.display.flip()
         clock.tick(FPS)
 
@@ -104,4 +113,3 @@ def run():
 
 if __name__ == "__main__":
     run()
-    

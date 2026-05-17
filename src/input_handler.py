@@ -4,6 +4,7 @@ InputHandler: mouse ve klavye olaylarını işler.
 
 import pygame
 
+from shapes.polygon import Polygon
 from src.utils.constants import (
     TOOL_SELECT, TOOL_LINE, TOOL_RECT, TOOL_CIRCLE, TOOL_TRIANGLE,
     TOOL_MOVE, TOOL_ROTATE, TOOL_SCALE,
@@ -15,6 +16,9 @@ from src.shapes.line import Line
 from src.shapes.rectangle import Rectangle
 from src.shapes.circle import Circle
 from src.shapes.triangle import Triangle
+from src.shapes.polygon import Polygon
+from src.shapes.star import Star
+from src.shapes.ellipse import Ellipse
 
 
 def snap(val, grid=GRID_SIZE):
@@ -34,6 +38,7 @@ class InputHandler:
         self.current_fill_color = (0.8, 0.8, 0.8)
         self.current_fill = True
         self.current_line_width = 2.0
+        self.current_alpha = 1.0
 
         self._drawing = False
         self._start_x = 0
@@ -49,6 +54,12 @@ class InputHandler:
 
         self._last_click_time = 0
         self._last_click_pos = None
+
+        self.polygon_sides = 6
+        self.polygon_input_string = "6"
+
+        self.star_points = 5
+        self.star_input_string = "5"
 
         self.action_hints = {
             "select": "Click on the object you want to select",
@@ -79,6 +90,11 @@ class InputHandler:
                 if toolbar_action:
                     self._handle_toolbar_action(toolbar_action)
 
+            if self.properties_panel:
+                panel_action = self.properties_panel.handle_mouse_motion(event.pos[0], event.pos[1])
+                if panel_action:
+                    self._handle_panel_action(panel_action)
+
             self._on_mouse_move(event)
 
             if self.status_bar:
@@ -87,6 +103,9 @@ class InputHandler:
         elif event.type == pygame.MOUSEBUTTONUP:
             if self.toolbar:
                 self.toolbar.handle_mouse_up()
+
+            if self.properties_panel:
+                self.properties_panel.handle_mouse_up()
 
             self._on_mouse_up(event)
 
@@ -196,7 +215,7 @@ class InputHandler:
             else:
                 self._reset_action_states()
 
-        elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE, TOOL_TRIANGLE):
+        elif self.current_tool in (TOOL_LINE, TOOL_RECT, TOOL_CIRCLE, TOOL_TRIANGLE, "polygon", "star", "ellipse"):
             self.scene.deselect()
             self._reset_action_states()
             self._drawing = True
@@ -316,6 +335,15 @@ class InputHandler:
                 selected.line_width = width
 
             return
+        
+        if action.startswith("current_line_style:"):
+            style = action.split(":")[1]
+            self.current_line_style = style
+            
+            # This is the line that actually updates the shape you clicked!
+            if selected:
+                selected.line_style = style
+            return
 
         self.current_tool = action
         self._reset_action_states()
@@ -365,6 +393,14 @@ class InputHandler:
             selected.fill_color = color
             self.current_fill_color = color
 
+        elif action.startswith("selected_alpha:"):
+            alpha_val = float(action.split(":")[1])
+            self.current_alpha = alpha_val
+            if selected:
+                selected.alpha = alpha_val
+            return
+
+
         elif action == "bring_front":
             self.scene.bring_to_front(selected)
 
@@ -412,7 +448,51 @@ class InputHandler:
         mods = pygame.key.get_mods()
         ctrl = mods & pygame.KMOD_CTRL
 
-        if event.key == pygame.K_DELETE:
+        if self.current_tool == "polygon":
+            if event.key == pygame.K_BACKSPACE:
+                self.polygon_input_string = self.polygon_input_string[:-1]
+            elif event.unicode.isdigit():
+                self.polygon_input_string += event.unicode
+
+            if len(self.polygon_input_string) > 2:
+                self.polygon_input_string = self.polygon_input_string[-2:]
+
+            try:
+                val = int(self.polygon_input_string)
+                self.polygon_sides = max(3, min(30, val))
+            except ValueError:
+                self.polygon_sides = 3
+
+        if self.current_tool == "star":
+            if event.key == pygame.K_BACKSPACE:
+                self.star_input_string = self.star_input_string[:-1]
+            elif event.unicode.isdigit():
+                self.star_input_string += event.unicode
+
+            if len(self.star_input_string) > 2:
+                self.star_input_string = self.star_input_string[-2:]
+
+            try:
+                val = int(self.star_input_string)
+                self.star_points = max(3, min(40, val)) # Limit to 40 pointed stars max
+            except ValueError:
+                self.star_points = 3
+
+        # --- GLOBAL ROTATION CONTROLS (Q, E, 0) ---
+        if event.key == pygame.K_q:
+            if not hasattr(self.scene, "global_rotation"):
+                self.scene.global_rotation = 0.0
+            self.scene.global_rotation -= 5.0
+
+        elif event.key == pygame.K_e:
+            if not hasattr(self.scene, "global_rotation"):
+                self.scene.global_rotation = 0.0
+            self.scene.global_rotation += 5.0
+
+        elif event.key == pygame.K_0:
+            self.scene.global_rotation = 0.0
+
+        elif event.key == pygame.K_DELETE:
             self.scene.delete_selected()
 
         elif event.key == pygame.K_r:
@@ -450,6 +530,15 @@ class InputHandler:
             from src.utils.file_ops import load_scene
             load_scene(self.scene)
 
+        # --- EXPLODE AND JOIN CONTROLS ---
+        elif event.key == pygame.K_x:
+            self.scene.explode_selected()
+            
+        elif event.key == pygame.K_j:
+            self.scene.join_selected()
+            
+        # (Your existing Q, E, 0 rotation checks stay here...)
+
     def _hex_to_rgb(self, hex_code):
         hex_code = hex_code.replace("#", "")
 
@@ -460,7 +549,25 @@ class InputHandler:
         return r, g, b
 
     def _canvas_pos(self, pos):
-        return pos[0] - CANVAS_X, pos[1]
+        import math
+        sx, sy = pos
+        
+        # 1. Find the exact center of your canvas
+        cx = CANVAS_X + CANVAS_W / 2
+        cy = CANVAS_H / 2
+
+        # 2. Get the inverse of the global rotation in radians
+        rotation = getattr(self.scene, "global_rotation", 0.0)
+        angle_rad = math.radians(-rotation) 
+        
+        cos_a = math.cos(angle_rad)
+        sin_a = math.sin(angle_rad)
+
+        # 3. Apply 2D Rotation matrix around the center point
+        rx = cos_a * (sx - cx) - sin_a * (sy - cy) + cx
+        ry = sin_a * (sx - cx) + cos_a * (sy - cy) + cy
+
+        return rx - CANVAS_X, ry
 
     def _in_canvas(self, cx, cy):
         return 0 <= cx <= CANVAS_W and 0 <= cy <= CANVAS_H
@@ -497,6 +604,25 @@ class InputHandler:
 
             shape = Triangle(x1, y1, x2, y2, x3, y3)
 
+        elif self.current_tool == "polygon":
+            import math
+            radius = math.hypot(mx - sx, my - sy)
+            shape = Polygon(sx, sy, radius, self.polygon_sides)
+
+        elif self.current_tool == "star":
+            import math
+            radius = math.hypot(mx - sx, my - sy)
+            shape = Star(sx, sy, radius, self.star_points)
+
+        elif self.current_tool == "ellipse":
+            # Calculates the bounding box exactly like a rectangle
+            x = min(sx, mx)
+            y = min(sy, my)
+            width = abs(mx - sx)
+            height = abs(my - sy)
+
+            shape = Ellipse(x, y, width, height)
+
         else:
             return
 
@@ -504,5 +630,8 @@ class InputHandler:
         shape.fill_color = self.current_fill_color
         shape.fill = self.current_fill
         shape.line_width = self.current_line_width
+        shape.alpha = self.current_alpha
+
+        shape.line_style = getattr(self, "current_line_style", "solid")
 
         self._preview = shape

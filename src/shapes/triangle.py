@@ -23,19 +23,30 @@ class Triangle(BaseShape):
         points = self.get_transformed_points()
 
         if self.fill:
-            glColor3f(*self.fill_color)
+            glColor4f(*self.fill_color, self.alpha)
             glBegin(GL_TRIANGLES)
             for x, y in points:
                 glVertex2f(x, y)
             glEnd()
 
-        glColor3f(*self.outline_color)
+        glColor4f(*self.outline_color, self.alpha)
         glLineWidth(self.line_width)
+
+        style = getattr(self, "line_style", "solid")
+        if style == "dashed":
+            glEnable(GL_LINE_STIPPLE)
+            glLineStipple(3, 0x00FF)
+        elif style == "dotted":
+            glEnable(GL_LINE_STIPPLE)
+            glLineStipple(1, 0xAAAA)
 
         glBegin(GL_LINE_LOOP)
         for x, y in points:
             glVertex2f(x, y)
         glEnd()
+
+        if style != "solid":
+            glDisable(GL_LINE_STIPPLE)
 
         if self.selected:
             self.draw_selection_box()

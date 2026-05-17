@@ -1,32 +1,35 @@
 """
-Circle shape.
+Star shape.
 """
 import math
 from OpenGL.GL import *
 from src.shapes.base import BaseShape
 
-
-SEGMENTS = 64
-
-
-class Circle(BaseShape):
-    def __init__(self, cx=0, cy=0, radius=50):
+class Star(BaseShape):
+    def __init__(self, cx=0, cy=0, radius=50, points=5):
         super().__init__()
         self.cx = cx
         self.cy = cy
         self.radius = radius
+        self.points = max(3, points) # Minimum 3-pointed star
+        self.inner_ratio = 0.4       # 0.4 gives a classic star proportion
 
     def get_points(self):
-        points = []
-
-        for i in range(SEGMENTS):
-            angle = 2 * math.pi * i / SEGMENTS
-            points.append((
-                self.cx + self.radius * math.cos(angle),
-                self.cy + self.radius * math.sin(angle),
+        vertex_points = []
+        total_vertices = self.points * 2
+        
+        for i in range(total_vertices):
+            # Alternate between outer radius and inner radius
+            current_radius = self.radius if i % 2 == 0 else self.radius * self.inner_ratio
+            
+            # Angle step is pi / points (half a slice per vertex)
+            angle = (math.pi / self.points) * i - (math.pi / 2)
+            
+            vertex_points.append((
+                self.cx + current_radius * math.cos(angle),
+                self.cy + current_radius * math.sin(angle),
             ))
-
-        return points
+        return vertex_points
 
     def get_transformed_center(self):
         return self.get_transformed_point(self.cx, self.cy)
@@ -34,19 +37,18 @@ class Circle(BaseShape):
     def draw(self):
         points = self.get_transformed_points()
 
+        # 1. Fill
         if self.fill:
             cx, cy = self.get_transformed_center()
-
             glColor4f(*self.fill_color, self.alpha)
             glBegin(GL_TRIANGLE_FAN)
             glVertex2f(cx, cy)
-
             for x, y in points:
                 glVertex2f(x, y)
-
-            glVertex2f(points[0][0], points[0][1])
+            glVertex2f(points[0][0], points[0][1]) # Close the loop
             glEnd()
 
+        # 2. Outline with Stipple Support
         glColor4f(*self.outline_color, self.alpha)
         glLineWidth(self.line_width)
 
@@ -66,6 +68,7 @@ class Circle(BaseShape):
         if style != "solid":
             glDisable(GL_LINE_STIPPLE)
 
+        # 3. UI Handles
         if self.selected:
             self.draw_selection_box()
             self.draw_rotate_handle()
@@ -76,11 +79,12 @@ class Circle(BaseShape):
             "cx": self.cx,
             "cy": self.cy,
             "radius": self.radius,
+            "points": self.points,
         })
         return data
 
     @classmethod
     def from_dict(cls, data):
-        shape = cls(data["cx"], data["cy"], data["radius"])
+        shape = cls(data["cx"], data["cy"], data["radius"], data["points"])
         shape.load_common_data(data)
         return shape

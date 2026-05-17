@@ -26,15 +26,26 @@ class Line(BaseShape):
         return points[0], points[1]
 
     def draw(self):
-        glColor3f(*self.outline_color)
+        glColor4f(*self.outline_color, self.alpha)
         glLineWidth(self.line_width)
 
         (x1, y1), (x2, y2) = self.get_transformed_endpoints()
+
+        style = getattr(self, "line_style", "solid")
+        if style == "dashed":
+            glEnable(GL_LINE_STIPPLE)
+            glLineStipple(3, 0x00FF)
+        elif style == "dotted":
+            glEnable(GL_LINE_STIPPLE)
+            glLineStipple(1, 0xAAAA)
 
         glBegin(GL_LINES)
         glVertex2f(x1, y1)
         glVertex2f(x2, y2)
         glEnd()
+
+        if style != "solid":
+            glDisable(GL_LINE_STIPPLE)
 
         if self.selected:
             self.draw_selection_box()
