@@ -18,7 +18,7 @@ A lightweight 2D CAD editor built with Python, Pygame, and PyOpenGL. The project
 
 ## Demo Video
 
-[Watch the demo video](https://example.com/demo-video)
+[▶️ Watch the demo video](https://youtu.be/FrOTqft9TfM)
 
 ## Overview
 
