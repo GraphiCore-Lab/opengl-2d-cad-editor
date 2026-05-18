@@ -10,10 +10,10 @@ class Polyline(BaseShape):
     def __init__(self, vertices=None, closed=False):
         super().__init__()
         self.vertices = vertices if vertices else []
-        self.closed = closed
+        self.closed = closed    # If True, last vertex connects back to first
         self.fill = False # Polylines default to no fill unless specifically requested
         
-        # Calculate a safe center so BaseShape doesn't crash if it looks for it
+        # Seed self.x/self.y so BaseShape selection/handle logic has a valid anchor
         if self.vertices:
             cx, cy = self.get_center()
             self.x = cx
@@ -32,11 +32,9 @@ class Polyline(BaseShape):
         xs = [p[0] for p in self.vertices]
         ys = [p[1] for p in self.vertices]
         return (sum(xs) / len(xs), sum(ys) / len(ys))
-
-    # --- THE MAGIC FIX: OVERRIDING DEFAULT TRANSFORMS ---
-    # We store the exact screen coordinates in self.vertices, so we just
-    # return them directly and apply move/rotate/scale permanently to the list!
     
+    #Polyline stores absolute world coordinates directly in self.vertices,
+    #so transforms are applied in-place instead of through the base matrix pipeline.
     def get_transformed_points(self):
         return self.vertices 
 
@@ -119,7 +117,7 @@ class Polyline(BaseShape):
 
         for i in range(len(points)):
             if not self.closed and i == len(points) - 1:
-                break
+                break   # Open path: skip the wraparound segment back to vertex 0
                 
             p1 = points[i]
             p2 = points[(i + 1) % len(points)]
@@ -128,7 +126,7 @@ class Polyline(BaseShape):
             dy = p2[1] - p1[1]
             length_sq = dx * dx + dy * dy
             
-            if length_sq == 0: continue
+            if length_sq == 0: continue # Skip zero-length degenerate segments
             
             t = max(0, min(1, ((x - p1[0]) * dx + (y - p1[1]) * dy) / length_sq))
             proj_x = p1[0] + t * dx

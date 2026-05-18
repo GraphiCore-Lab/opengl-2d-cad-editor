@@ -27,46 +27,29 @@ class Renderer:
         pygame.font.init()
         self.input_font = pygame.font.SysFont("segoeui", 12)
 
-    # ─────────────────────────────────────────────
-
     def render(self):
-        """Ana render fonksiyonu — her frame çağrılır."""
+        """Main render function — called by every frame."""
         glClear(GL_COLOR_BUFFER_BIT)
 
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
         glPushMatrix()
-        self._apply_global_transform()
+        self._apply_global_transform()  # Rotate entire scene around canvas center
 
         self._draw_canvas_bg()
         if self.show_grid:
             self._draw_grid()
         for shape in self.scene.get_shapes():
-            shape.draw()
-
-        
-        
-        # Canvas
-        self._draw_canvas_bg()
-
-        # Grid
-        if self.show_grid:
-            self._draw_grid()
-
-        # Shape’ler (z-order)
-        for shape in self.scene.get_shapes():
-            shape.draw()
+            shape.draw()       # Shapes are pre-sorted by z-index in scene.get_shapes()
 
         glPopMatrix()
-    # ─────────────────────────────────────────────
 
     def _draw_canvas_bg(self):
         r, g, b = _rgb(COLOR_CANVAS)
         glColor3f(r, g, b)
-        
-        # Draw a massive quad that extends way off-screen 
-        # so you never see the black void when rotating
+         
+        # Quad extends to ±4000 so rotating the camera never exposes the black void behind the canvas
         glBegin(GL_QUADS)
         glVertex2f(-4000, -4000)
         glVertex2f(4000, -4000)
@@ -75,22 +58,19 @@ class Renderer:
 
         glEnd()
 
-    # ─────────────────────────────────────────────
-
     def _draw_grid(self):
         # Define massive boundaries for the infinite canvas effect
         start_bound = -4000
         end_bound = 4000
 
-        # --- İnce grid (Minor Grid) ---
+        #Minor Grid
         r, g, b = _rgb(COLOR_GRID)
         glColor3f(r, g, b)
         glLineWidth(1.0)
 
         glBegin(GL_LINES)
 
-        # Dikey (Vertical)
-        # We step backwards from CANVAS_X to ensure the grid stays perfectly locked
+        # Step backwards from anchor before looping forward so lines stay locked to canvas origin
         x = CANVAS_X
         while x > start_bound:
             x -= GRID_SIZE
@@ -100,8 +80,6 @@ class Renderer:
             glVertex2f(x, end_bound)
             x += GRID_SIZE
 
-        # Yatay (Horizontal)
-        # We step backwards from 0
         y = 0
         while y > start_bound:
             y -= GRID_SIZE
@@ -113,16 +91,15 @@ class Renderer:
 
         glEnd()
 
-        # --- Kalın grid (Major Grid - her 5 karede bir) ---
+        #Major Grid
         r, g, b = _rgb(COLOR_GRID_MAJOR)
         glColor3f(r, g, b)
         glLineWidth(2.0)
 
         glBegin(GL_LINES)
 
-        # Dikey (Vertical)
+        # Major grid every 5 cells for visual reference at a glance
         x = CANVAS_X
-        # Step backwards by exactly 5 grid chunks so the major lines don't lose sync
         while x > start_bound:
             x -= GRID_SIZE * 5
             
@@ -131,7 +108,6 @@ class Renderer:
             glVertex2f(x, end_bound)
             x += GRID_SIZE * 5
 
-        # Yatay (Horizontal)
         y = 0
         while y > start_bound:
             y -= GRID_SIZE * 5
@@ -146,16 +122,15 @@ class Renderer:
         glLineWidth(1.0)
 
     def draw_preview(self, shape):
-        """
-        Çizim sırasında geçici shape (mouse basılıyken)
-        """
+        """Temporary shape during drawing (while dragging mouse)."""
         if shape is None:
             return
         
         glPushMatrix()
-        self._apply_global_transform() # Apply rotation here too!
+        self._apply_global_transform() 
         
         target_alpha = getattr(shape, "alpha", 1.0)
+        # Render the in-progress shape at half opacity to distinguish it from committed shapes
         preview_alpha = target_alpha * 0.5 
         
         glColor4f(*shape.outline_color, preview_alpha)
@@ -177,6 +152,7 @@ class Renderer:
 
         glPushMatrix()
         self._apply_global_transform()
+        # Crosshair + circle indicator marks the exact rotation center while dragging
         cx, cy = shape.get_center()
 
         glColor3f(0.0, 0.7, 1.0)
@@ -186,6 +162,7 @@ class Renderer:
         glVertex2f(cx - 8, cy)
         glVertex2f(cx + 8, cy)
         glVertex2f(cx, cy - 8)
+  
         glVertex2f(cx, cy + 8)
         glEnd()
 
@@ -207,17 +184,14 @@ class Renderer:
         import pygame
         mx, my = pygame.mouse.get_pos()
         
-        # Box positioning (offset slightly bottom-right from cursor)
         box_x = mx + 15
-        box_y = my + 15
+        box_y = my + 15     # Offset from cursor so the box never hides the drawing tip
         box_w = 60
         box_h = 24
         
-        # Enable blending for a sleek, semi-transparent HUD look
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         
-        # Draw dark semi-transparent background
         glColor4f(0.1, 0.1, 0.15, 0.85)
         glBegin(GL_QUADS)
         glVertex2f(box_x, box_y)
@@ -226,7 +200,6 @@ class Renderer:
         glVertex2f(box_x, box_y + box_h)
         glEnd()
         
-        # Draw precise blue border
         glColor4f(0.3, 0.6, 1.0, 1.0)
         glLineWidth(1.0)
         glBegin(GL_LINE_LOOP)
@@ -239,15 +212,13 @@ class Renderer:
         glDisable(GL_BLEND)
 
         label_text = "Sides" if tool == "polygon" else "Points"
-        
 
-        # We need to borrow Pygame's font renderer briefly
         font = pygame.font.SysFont("segoeui", 12)
         text_surface = self.input_font.render(f"{label_text}: {value_string}", True, (255, 255, 255))
         text_data = pygame.image.tostring(text_surface, "RGBA", True)
         
         glEnable(GL_BLEND)
-        glRasterPos2f(box_x + 4, box_y + 16) # Align text inside box
+        glRasterPos2f(box_x + 4, box_y + 16) # +16 flips Y anchor to top-left for glDrawPixels
         glDrawPixels(text_surface.get_width(), text_surface.get_height(), GL_RGBA, GL_UNSIGNED_BYTE, text_data)
         glDisable(GL_BLEND)
 
@@ -256,7 +227,7 @@ class Renderer:
         cx = CANVAS_X + CANVAS_W / 2
         cy = CANVAS_H / 2
         
-        # Move to center, rotate, move back
+        # Translate→Rotate→Translate-back rotates around canvas center, not the OpenGL origin
         glTranslatef(cx, cy, 0)
         rotation = getattr(self.scene, "global_rotation", 0.0)
         glRotatef(rotation, 0, 0, 1)

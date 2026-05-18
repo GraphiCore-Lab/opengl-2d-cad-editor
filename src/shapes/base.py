@@ -10,6 +10,7 @@ from src.core.transform import (
 
 
 class BaseShape:
+    """Base class for all shapes, providing common properties and methods."""
     def __init__(self):
         self.outline_color = (1.0, 1.0, 1.0)
         self.fill_color = (0.6, 0.6, 0.6)
@@ -19,7 +20,7 @@ class BaseShape:
         self.selected = False
         self.transform = np.identity(3, dtype=float)
 
-    # ---------- Required methods ----------
+    # Required methods 
     def draw(self):
         raise NotImplementedError
 
@@ -30,7 +31,7 @@ class BaseShape:
         points = self.get_transformed_points()
         return self.bounds_from_points(points)
 
-    # ---------- Transform helpers ----------
+    #  Transform helpers 
     def apply_transform(self, matrix):
         self.transform = matrix @ self.transform
 
@@ -53,7 +54,7 @@ class BaseShape:
         cx, cy = self.get_center()
         self.apply_transform(scale_matrix(sx, sy, cx, cy))
 
-    # ---------- Selection / bounds ----------
+    #  Selection / bounds 
     def bounds_from_points(self, points, pad=6):
         xs = [p[0] for p in points]
         ys = [p[1] for p in points]
@@ -105,7 +106,7 @@ class BaseShape:
 
         glDisable(GL_LINE_STIPPLE)
 
-    # ---------- Rotate handle ----------
+    #  Rotate handle 
     def get_rotate_handle_pos(self):
         x, y, w, h = self.get_bounds()
         return x + w / 2, y - 25
@@ -139,7 +140,7 @@ class BaseShape:
         glVertex2f(hx, hy - 4)
         glEnd()
 
-    # ---------- Serialization ----------
+    #  Serialization 
     def to_dict(self):
         return {
             "type": self.__class__.__name__,

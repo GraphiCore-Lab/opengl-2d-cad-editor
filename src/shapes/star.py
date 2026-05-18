@@ -10,19 +10,19 @@ class Star(BaseShape):
         super().__init__()
         self.cx = cx
         self.cy = cy
-        self.radius = radius
+        self.radius = radius        # Outer tip radius
         self.points = max(3, points) # Minimum 3-pointed star
-        self.inner_ratio = 0.4       # 0.4 gives a classic star proportion
+        self.inner_ratio = 0.4       # Inner radius = outer * 0.4; controls how "sharp" the tips are
 
     def get_points(self):
         vertex_points = []
-        total_vertices = self.points * 2
+        total_vertices = self.points * 2    # Each point has one outer tip + one inner valley
         
         for i in range(total_vertices):
-            # Alternate between outer radius and inner radius
+            # Even indices → outer tip, odd indices → inner valley
             current_radius = self.radius if i % 2 == 0 else self.radius * self.inner_ratio
             
-            # Angle step is pi / points (half a slice per vertex)
+            # Divide the full circle into (points*2) equal slices; offset by -pi/2 to point upward
             angle = (math.pi / self.points) * i - (math.pi / 2)
             
             vertex_points.append((

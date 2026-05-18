@@ -11,9 +11,9 @@ from src.utils.constants import HIT_THRESHOLD
 class Line(BaseShape):
     def __init__(self, x1=0, y1=0, x2=100, y2=100):
         super().__init__()
-        self.x1, self.y1 = x1, y1
-        self.x2, self.y2 = x2, y2
-        self.fill = False
+        self.x1, self.y1 = x1, y1       #Start point
+        self.x2, self.y2 = x2, y2       #End point
+        self.fill = False               #Lines have no fill by definition
 
     def get_points(self):
         return [
@@ -56,17 +56,19 @@ class Line(BaseShape):
 
         dx = x2 - x1
         dy = y2 - y1
-        length_sq = dx * dx + dy * dy
+        length_sq = dx * dx + dy * dy       # Squared length avoids an unnecessary sqrt
 
         if length_sq == 0:
+            # Degenerate case: line is a single point
             distance = math.hypot(x - x1, y - y1)
         else:
+            # Project the query point onto the line segment, clamped to [0,1]
             t = max(0, min(1, ((x - x1) * dx + (y - y1) * dy) / length_sq))
             proj_x = x1 + t * dx
             proj_y = y1 + t * dy
             distance = math.hypot(x - proj_x, y - proj_y)
 
-        return distance <= HIT_THRESHOLD
+        return distance <= HIT_THRESHOLD        # Hit if within pixel tolerance
 
     def to_dict(self):
         data = super().to_dict()

@@ -38,7 +38,7 @@ class PropertiesPanel:
         self.alpha_slider_y = self.y + 165  
         self.alpha_slider_w = 170
         self.alpha_slider_h = 6
-        self.is_dragging_alpha = False
+        self.is_dragging_alpha = False      # Tracks whether the user is actively dragging the opacity slider
 
     def draw(self, selected_shape):
         glColor3f(0.96, 0.96, 0.96)
@@ -49,6 +49,7 @@ class PropertiesPanel:
 
         self._draw_text("Properties", self.x + 20, self.y + 20, self.title_font)
 
+        # Dim all edit buttons when nothing is selected to signal they are inactive
         if selected_shape is None:
             self._draw_text("No object selected", self.x + 20, self.y + 45, self.font)
         else:
@@ -74,6 +75,7 @@ class PropertiesPanel:
             text_x = button["x"] + 10
 
             if icon is not None:
+                # Position the icon flush to the right edge of the button with 8px padding
                 icon_x = button["x"] + button["w"] - 8 - icon.get_width()
                 icon_y = button["y"] + (button["h"] - icon.get_height()) / 2
                 self._draw_surface(icon, icon_x, icon_y)
@@ -86,6 +88,7 @@ class PropertiesPanel:
         glColor3f(0.8, 0.8, 0.8)
         self._draw_rounded_rect(self.alpha_slider_x, self.alpha_slider_y, self.alpha_slider_w, self.alpha_slider_h, 3) 
         
+        # Read alpha from the selected shape; default to fully opaque if none selected
         current_alpha = 1.0
         if selected_shape and hasattr(selected_shape, "alpha"):
             current_alpha = selected_shape.alpha
@@ -98,6 +101,7 @@ class PropertiesPanel:
         thumb_w = 12
         thumb_h = 16
         thumb_rect_x = self.alpha_slider_x + active_w - (thumb_w / 2)
+        # Center the thumb vertically over the thin track
         thumb_rect_y = self.alpha_slider_y - (thumb_h - self.alpha_slider_h) / 2
         
         glColor3f(1.0, 1.0, 1.0)
@@ -105,7 +109,7 @@ class PropertiesPanel:
         glColor3f(0.5, 0.5, 0.5)
         self._draw_rounded_border(thumb_rect_x, thumb_rect_y, thumb_w, thumb_h, 3)
 
-        # Separate save action from edit tools visually.
+        # Horizontal separator visually isolates the destructive Save button from edit tools
         sep_y = self.y + self.height - 66
         glColor3f(0.75, 0.75, 0.75)
         glBegin(GL_LINES)
@@ -118,6 +122,7 @@ class PropertiesPanel:
             if button["x"] <= x <= button["x"] + button["w"] and button["y"] <= y <= button["y"] + button["h"]:
                 return button["name"]
 
+        # Expand the slider's hit area by 10px on all sides for easier mouse targeting
         pad = 10
         if (self.alpha_slider_x - pad <= x <= self.alpha_slider_x + self.alpha_slider_w + pad and 
             self.alpha_slider_y - pad <= y <= self.alpha_slider_y + self.alpha_slider_h + pad):
@@ -144,17 +149,19 @@ class PropertiesPanel:
         glEnd()
 
     def _rounded_rect_points(self, x, y, w, h, radius, segments=6):
+        # Clamp radius so it never exceeds half the shortest side (prevents geometric artifacts)
         r = max(0.0, min(float(radius), w / 2.0, h / 2.0))
 
         if r == 0:
             return [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
 
         points = []
+        # corner_data: (arc center x, arc center y, start angle, end angle) for each corner
         corner_data = [
-            (x + w - r, y + r, -1.5707963, 0.0),
-            (x + w - r, y + h - r, 0.0, 1.5707963),
-            (x + r, y + h - r, 1.5707963, 3.1415926),
-            (x + r, y + r, 3.1415926, 4.7123890),
+            (x + w - r, y + r, -1.5707963, 0.0),        # Top-right corner (start pointing up, end pointing right)
+            (x + w - r, y + h - r, 0.0, 1.5707963),     # Bottom-right corner (start pointing right, end pointing down)
+            (x + r, y + h - r, 1.5707963, 3.1415926),   # Bottom-left corner (start pointing down, end pointing left)
+            (x + r, y + r, 3.1415926, 4.7123890),       # Top-left corner (start pointing left, end pointing up)
         ]
 
         for cx, cy, start_a, end_a in corner_data:
@@ -222,9 +229,10 @@ class PropertiesPanel:
         self._draw_surface(surface, x, y)
 
     def _calc_alpha_action(self, x):
+        # Clamp x to slider bounds then normalize to [0.0, 1.0]
         clamped_x = max(self.alpha_slider_x, min(x, self.alpha_slider_x + self.alpha_slider_w))
         alpha_val = (clamped_x - self.alpha_slider_x) / self.alpha_slider_w
-        return f"selected_alpha:{alpha_val:.2f}"
+        return f"selected_alpha:{alpha_val:.2f}"        # Returns an action string parsed by InputHandler
 
     def handle_mouse_motion(self, x, y):
         if getattr(self, "is_dragging_alpha", False):
@@ -235,11 +243,13 @@ class PropertiesPanel:
         self.is_dragging_alpha = False
 
     def _draw_surface(self, surface, x, y):
+        # Convert Pygame surface to raw RGBA bytes for OpenGL to consume via glDrawPixels
         text_data = pygame.image.tostring(surface, "RGBA", True)
 
         glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)   # Standard transparency blending
 
+        # glRasterPos sets the screen anchor; +height flips the Y because OpenGL origin is bottom-left
         glRasterPos2f(x, y + surface.get_height())
         glDrawPixels(
             surface.get_width(),
