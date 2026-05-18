@@ -8,14 +8,13 @@ from src.shapes.base import BaseShape
 class Ellipse(BaseShape):
     def __init__(self, x=0, y=0, width=100, height=60):
         super().__init__()
-        self.x = x
-        self.y = y
+        self.x = x      # Top-left corner X of the bounding box
+        self.y = y      # Top-left corner Y of the bounding box
         self.width = width
         self.height = height
 
     def get_points(self):
         points = []
-        # Find the center and radii based on the bounding box
         cx = self.x + self.width / 2.0
         cy = self.y + self.height / 2.0
         rx = self.width / 2.0
@@ -26,40 +25,39 @@ class Ellipse(BaseShape):
         for i in range(segments):
             angle = 2 * math.pi * i / segments
             points.append((
-                cx + rx * math.cos(angle),
-                cy + ry * math.sin(angle)
+                cx + rx * math.cos(angle),      # Parametric ellipse: x = cx + rx*cos(θ)
+                cy + ry * math.sin(angle)        # Parametric ellipse: y = cy + ry*sin(θ)
             ))
         return points
 
     def draw(self):
         points = self.get_transformed_points()
 
-        # 1. Fill
         if self.fill:
-            # We need the transformed center point to start the Triangle Fan
+            # Transform the logical center point into world space for the fan origin
             cx_base = self.x + self.width / 2.0
             cy_base = self.y + self.height / 2.0
             cx, cy = self.get_transformed_point(cx_base, cy_base)
 
             glColor4f(*self.fill_color, self.alpha)
-            glBegin(GL_TRIANGLE_FAN)
+            glBegin(GL_TRIANGLE_FAN)        # Fan from center fills the ellipse without tesselation
             glVertex2f(cx, cy)
             for px, py in points:
                 glVertex2f(px, py)
-            glVertex2f(points[0][0], points[0][1]) # Close the loop
+            glVertex2f(points[0][0], points[0][1])  # Repeat first vertex to close the fan
             glEnd()
 
-        # 2. Outline with Stipple Support
+        # Apply the stipple pattern before drawing the outline loop
         glColor4f(*self.outline_color, self.alpha)
         glLineWidth(self.line_width)
 
         style = getattr(self, "line_style", "solid")
         if style == "dashed":
             glEnable(GL_LINE_STIPPLE)
-            glLineStipple(3, 0x00FF)
+            glLineStipple(3, 0x00FF)        # Factor 3, alternating 8-bit on/off pattern
         elif style == "dotted":
             glEnable(GL_LINE_STIPPLE)
-            glLineStipple(1, 0xAAAA)
+            glLineStipple(1, 0xAAAA)        # Factor 1, every other pixel produces dots
 
         glBegin(GL_LINE_LOOP)
         for px, py in points:

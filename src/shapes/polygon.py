@@ -8,9 +8,9 @@ from src.shapes.base import BaseShape
 class Polygon(BaseShape):
     def __init__(self, cx=0, cy=0, radius=50, sides=6):
         super().__init__()
-        self.cx = cx
-        self.cy = cy
-        self.radius = radius
+        self.cx = cx        # Center X of the polygon
+        self.cy = cy        # Center Y of the polygon
+        self.radius = radius        # Circumradius: distance from center to each vertex
         self.sides = max(3, sides) # Minimum 3 sides (triangle)
 
     def get_points(self):

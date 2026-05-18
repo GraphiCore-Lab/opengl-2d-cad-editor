@@ -8,9 +8,9 @@ from src.shapes.base import BaseShape
 class Triangle(BaseShape):
     def __init__(self, x1=0, y1=0, x2=100, y2=100, x3=50, y3=0):
         super().__init__()
-        self.x1, self.y1 = x1, y1
-        self.x2, self.y2 = x2, y2
-        self.x3, self.y3 = x3, y3
+        self.x1, self.y1 = x1, y1   # First vertex
+        self.x2, self.y2 = x2, y2   # Second vertex
+        self.x3, self.y3 = x3, y3   # Third vertex (apex by default)
 
     def get_points(self):
         return [
@@ -24,7 +24,7 @@ class Triangle(BaseShape):
 
         if self.fill:
             glColor4f(*self.fill_color, self.alpha)
-            glBegin(GL_TRIANGLES)
+            glBegin(GL_TRIANGLES)   # GL_TRIANGLES draws a filled triangle from exactly 3 vertices
             for x, y in points:
                 glVertex2f(x, y)
             glEnd()

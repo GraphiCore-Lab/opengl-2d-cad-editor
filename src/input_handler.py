@@ -53,12 +53,12 @@ class InputHandler:
         self._transform_last = (0, 0)
 
         self._last_click_time = 0
-        self._last_click_pos = None
+        self._last_click_pos = None     # Used to detect double-clicks without relying on OS events
 
-        self.polygon_sides = 6
+        self.polygon_sides = 6      # Live value updated by keyboard during polygon drawing
         self.polygon_input_string = "6"
 
-        self.star_points = 5
+        self.star_points = 5        # Live value updated by keyboard during star drawing
         self.star_input_string = "5"
 
         self.action_hints = {
@@ -138,7 +138,7 @@ class InputHandler:
         if self.toolbar:
             clicked_tool = self.toolbar.handle_click(x, y)
 
-            # Edit colors popup açıksa tıklama arkadaki canvas/panele geçmesin
+            # Block canvas interaction while the color picker overlay is open
             if getattr(self.toolbar, "color_picker_open", False):
                 if clicked_tool:
                     self._handle_toolbar_action(clicked_tool)
@@ -176,6 +176,7 @@ class InputHandler:
         if self.scene.selected:
             selected = self.scene.selected
 
+            # Rotate/scale handle clicks take priority over the active drawing tool
             if hasattr(selected, "is_on_rotate_handle") and selected.is_on_rotate_handle(real_x, real_y):
                 self._reset_action_states()
                 self._rotating = True
@@ -242,6 +243,7 @@ class InputHandler:
         self._last_click_time = now
         self._last_click_pos = (x, y)
 
+        # Fallback manual detection: within 320ms and 14px counts as a double-click
         return dt <= 320 and dist_sq <= 14 * 14
 
     def _on_mouse_move(self, event):
@@ -269,15 +271,16 @@ class InputHandler:
 
         elif self._rotating and self.scene.selected:
             dx = real_x - self._transform_last[0]
-            angle = dx * 0.5
+            angle = dx * 0.5        # Map horizontal drag distance to rotation angle (0.5 deg per pixel)
 
             self.scene.rotate_selected(angle)
             self._transform_last = (real_x, real_y)
 
         elif self._scaling and self.scene.selected:
+            # Map vertical drag to scale factor; upward drag (negative dy) increases size
             dy = real_y - self._transform_last[1]
             factor = 1.0 + (-dy * 0.01)
-            factor = max(0.1, factor)
+            factor = max(0.1, factor)   # Prevent collapsing to zero or negative scale
 
             self.scene.scale_selected(factor, factor)
             self._transform_last = (real_x, real_y)
@@ -340,9 +343,8 @@ class InputHandler:
             style = action.split(":")[1]
             self.current_line_style = style
             
-            # This is the line that actually updates the shape you clicked!
             if selected:
-                selected.line_style = style
+                selected.line_style = style # Apply immediately to the selected shape
             return
 
         self.current_tool = action
@@ -455,7 +457,7 @@ class InputHandler:
                 self.polygon_input_string += event.unicode
 
             if len(self.polygon_input_string) > 2:
-                self.polygon_input_string = self.polygon_input_string[-2:]
+                self.polygon_input_string = self.polygon_input_string[-2:]  # Cap at 2 digits (max 99 sides)
 
             try:
                 val = int(self.polygon_input_string)
@@ -478,7 +480,7 @@ class InputHandler:
             except ValueError:
                 self.star_points = 3
 
-        # --- GLOBAL ROTATION CONTROLS (Q, E, 0) ---
+        # Q/E rotate the global camera by 5° increments; 0 resets to upright
         if event.key == pygame.K_q:
             if not hasattr(self.scene, "global_rotation"):
                 self.scene.global_rotation = 0.0
@@ -530,14 +532,11 @@ class InputHandler:
             from src.utils.file_ops import load_scene
             load_scene(self.scene)
 
-        # --- EXPLODE AND JOIN CONTROLS ---
         elif event.key == pygame.K_x:
             self.scene.explode_selected()
             
         elif event.key == pygame.K_j:
             self.scene.join_selected()
-            
-        # (Your existing Q, E, 0 rotation checks stay here...)
 
     def _hex_to_rgb(self, hex_code):
         hex_code = hex_code.replace("#", "")
@@ -552,18 +551,17 @@ class InputHandler:
         import math
         sx, sy = pos
         
-        # 1. Find the exact center of your canvas
         cx = CANVAS_X + CANVAS_W / 2
         cy = CANVAS_H / 2
 
-        # 2. Get the inverse of the global rotation in radians
         rotation = getattr(self.scene, "global_rotation", 0.0)
+        # Apply inverse global rotation around the canvas center so mouse coords
+        # stay aligned with the visually rotated grid
         angle_rad = math.radians(-rotation) 
         
         cos_a = math.cos(angle_rad)
         sin_a = math.sin(angle_rad)
 
-        # 3. Apply 2D Rotation matrix around the center point
         rx = cos_a * (sx - cx) - sin_a * (sy - cy) + cx
         ry = sin_a * (sx - cx) + cos_a * (sy - cy) + cy
 
@@ -593,14 +591,15 @@ class InputHandler:
             shape = Circle(sx, sy, radius)
 
         elif self.current_tool == TOOL_TRIANGLE:
+            # Base edge spans the drag width; apex is centered above the start point
             x1 = sx
-            y1 = my
+            y1 = my #Bottom-left
 
             x2 = mx
-            y2 = my
+            y2 = my #Bottom-right
 
             x3 = (sx + mx) / 2
-            y3 = sy
+            y3 = sy   #Apex
 
             shape = Triangle(x1, y1, x2, y2, x3, y3)
 

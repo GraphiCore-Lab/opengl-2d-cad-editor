@@ -15,15 +15,15 @@ class StatusBar:
 
         self.hint_text = ""
         self.hint_started_at = 0
-        self.hint_duration_ms = 2400
-        self.hint_fade_ms = 550
+        self.hint_duration_ms = 2400    # Total time a hint stays visible
+        self.hint_fade_ms = 550     # Duration of the fade-out at the end
 
     def update_mouse_position(self, x, y):
         self.mouse_x = x
         self.mouse_y = y
 
     def show_hint(self, text, duration_ms=None):
-        # New hint replaces any currently visible one immediately.
+        # Calling this again mid-display immediately replaces the old hint
         self.hint_text = text or ""
         self.hint_started_at = pygame.time.get_ticks()
 
@@ -57,6 +57,7 @@ class StatusBar:
 
         elapsed = pygame.time.get_ticks() - self.hint_started_at
 
+        # hint_duration_ms reached: clear and stop drawing
         if elapsed >= self.hint_duration_ms:
             self.hint_text = ""
             return
@@ -64,8 +65,9 @@ class StatusBar:
         fade_start = self.hint_duration_ms - self.hint_fade_ms
 
         if elapsed < fade_start:
-            alpha = 255
+            alpha = 255     # Still in the fully visible window
         else:
+            # Linearly interpolate alpha from 255 → 0 over the fade window
             fade_progress = (elapsed - fade_start) / max(1, self.hint_fade_ms)
             alpha = max(0, int(255 * (1.0 - fade_progress)))
 
@@ -78,11 +80,11 @@ class StatusBar:
         box_w = text_surface.get_width() + pad_x * 2
         box_h = text_surface.get_height() + pad_y * 2
 
-        box_w = min(box_w, WIDTH - 20)
-        box_x = max(10, (WIDTH - box_w) / 2)
+        box_w = min(box_w, WIDTH - 20)      # Prevent the popup from overflowing the window edge
+        box_x = max(10, (WIDTH - box_w) / 2)    # Center horizontally with a 10px minimum margin
         box_y = y + max(1, (self.height - box_h) / 2)
 
-        bg_alpha = int(alpha * 0.9)
+        bg_alpha = int(alpha * 0.9)     # Background slightly more transparent than the text for contrast
         self._draw_rgba_rect(box_x, box_y, box_w, box_h, (0, 0, 0, bg_alpha))
         self._draw_rgba_border(box_x, box_y, box_w, box_h, (255, 255, 255, alpha), 2.0)
 
@@ -108,6 +110,7 @@ class StatusBar:
     def _draw_rgba_rect(self, x, y, w, h, rgba):
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Normalize 0–255 RGBA tuple to 0.0–1.0 range that OpenGL expects
         glColor4f(rgba[0] / 255.0, rgba[1] / 255.0, rgba[2] / 255.0, rgba[3] / 255.0)
 
         glBegin(GL_QUADS)
@@ -123,7 +126,7 @@ class StatusBar:
         glEnable(GL_BLEND)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         glColor4f(rgba[0] / 255.0, rgba[1] / 255.0, rgba[2] / 255.0, rgba[3] / 255.0)
-        glLineWidth(line_width)
+        glLineWidth(line_width)   
 
         glBegin(GL_LINE_LOOP)
         glVertex2f(x, y)
@@ -132,5 +135,5 @@ class StatusBar:
         glVertex2f(x, y + h)
         glEnd()
 
-        glLineWidth(1.0)
+        glLineWidth(1.0)    # Reset line width to default after drawing to avoid affecting other elements
         glDisable(GL_BLEND)

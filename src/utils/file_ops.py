@@ -26,7 +26,7 @@ from src.shapes.triangle import Triangle
 
 
 def _shape_factory(data):
-    """type string'e göre doğru shape sınıfını döndür."""
+    """Routes a deserialized dict to the correct shape class based on its type string."""
     shape_type = data.get("type")
 
     if shape_type == "Line":
@@ -42,17 +42,16 @@ def _shape_factory(data):
         return Triangle.from_dict(data)
 
     print(f"[load WARNING] Unknown shape type: {shape_type}")
-    return None
-
+    return None     # Unrecognized shapes are skipped gracefully rather than crashing the load
 
 def save_scene(scene, path=DEFAULT_SAVE_PATH):
     try:
         directory = os.path.dirname(path)
         if directory:
-            os.makedirs(directory, exist_ok=True)
+            os.makedirs(directory, exist_ok=True)   # Create parent directories if they don't exist yet
 
         with open(path, "w", encoding="utf-8") as file:
-            json.dump(scene.to_dict(), file, indent=2)
+            json.dump(scene.to_dict(), file, indent=2)  # Create parent directories if they don't exist yet
 
         print(f"[save] {path}")
         return True, None
@@ -64,7 +63,7 @@ def save_scene(scene, path=DEFAULT_SAVE_PATH):
 
 def save_artwork_dialog(scene):
     root = tk.Tk()
-    root.withdraw()
+    root.withdraw()     # Hide the Tk root window — only the file dialog should be visible
 
     try:
         path = filedialog.asksaveasfilename(
@@ -103,7 +102,7 @@ def save_artwork_dialog(scene):
         }
 
     if ext == "":
-        path = f"{path}.json"
+        path = f"{path}.json"   # Append .json if the user typed a name without an extension
 
     ok, error = save_scene(scene, path)
     if ok:
@@ -126,12 +125,15 @@ def save_artwork_png(path):
         if surface is None:
             raise RuntimeError("No active display surface")
 
+        # Read the current OpenGL framebuffer as raw RGBA bytes
         frame_bytes = glReadPixels(0, 0, WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE)
+        # True flag in fromstring flips the image vertically (OpenGL origin is bottom-left, Pygame is top-left)
         frame = pygame.image.fromstring(frame_bytes, (WIDTH, HEIGHT), "RGBA", True)
 
+        # Crop out the toolbar and status bar so only the drawing canvas is saved
         artwork_h = HEIGHT - TOOLBAR_HEIGHT - STATUS_BAR_HEIGHT
         crop_rect = pygame.Rect(CANVAS_X, TOOLBAR_HEIGHT, CANVAS_W, artwork_h)
-        crop_rect = crop_rect.clip(frame.get_rect())
+        crop_rect = crop_rect.clip(frame.get_rect())    # Clamp to frame bounds to prevent out-of-bounds blit
 
         artwork = pygame.Surface((crop_rect.width, crop_rect.height), pygame.SRCALPHA)
         artwork.blit(frame, (0, 0), crop_rect)

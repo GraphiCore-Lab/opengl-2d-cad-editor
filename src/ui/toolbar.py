@@ -32,7 +32,7 @@ class Toolbar:
         ]
 
         self.stroke_min = 1
-        self.stroke_mid = 6
+        self.stroke_mid = 6     # Midpoint maps to 50% of the slider — gives finer control in the 1–6 range
         self.stroke_max = 12
         self.dragging_stroke_slider = False
         self.stroke_slider_rect = {"x": 650, "y": 18, "w": 200, "h": 18}
@@ -73,9 +73,10 @@ class Toolbar:
         self.value_w = 42
         self.value_h = self.gradient_h
 
-        self.current_hue = 0.55
-        self.current_saturation = 0.65
-        self.current_value = 0.65
+        self.current_hue = 0.55     # H in HSV, range [0.0, 1.0]
+        self.current_saturation = 0.65      # S in HSV, range [0.0, 1.0]
+        self.current_value = 0.65       # V in HSV, range [0.0, 1.0]
+        # Convert initial HSV to RGB for OpenGL
         self.selected_color = colorsys.hsv_to_rgb(
             self.current_hue,
             self.current_saturation,
@@ -531,6 +532,7 @@ class Toolbar:
 
         glBegin(GL_QUADS)
 
+        # X-axis maps to hue, Y-axis maps to saturation (inverted: top = fully saturated)
         for ix in range(steps_x):
             hue = ix / (steps_x - 1)
 
@@ -543,6 +545,7 @@ class Toolbar:
 
                 glColor3f(r, g, b)
                 glVertex2f(x, y)
+                # Slightly oversize each cell by +1px to eliminate seams between quads
                 glVertex2f(x + cell_w + 1, y)
                 glVertex2f(x + cell_w + 1, y + cell_h + 1)
                 glVertex2f(x, y + cell_h + 1)
@@ -555,6 +558,7 @@ class Toolbar:
         marker_x = self.gradient_x + self.current_hue * self.gradient_w
         marker_y = self.gradient_y + (1.0 - self.current_saturation) * self.gradient_h
 
+        # Crosshair marker: black outer ring + white inner ring for visibility on any color
         glColor3f(0.0, 0.0, 0.0)
         self._draw_circle(marker_x, marker_y, 7, fill=False)
 
@@ -567,8 +571,9 @@ class Toolbar:
 
         glBegin(GL_QUADS)
 
+        # V channel only; H and S stay fixed so the strip shows dark→bright for the current color
         for i in range(steps):
-            value = 1.0 - (i / (steps - 1))
+            value = 1.0 - (i / (steps - 1))     # Top = 1.0 (bright), bottom = 0.0 (black)
             r, g, b = colorsys.hsv_to_rgb(
                 self.current_hue,
                 self.current_saturation,
@@ -896,8 +901,9 @@ class Toolbar:
     def _width_from_slider_x(self, x):
         sx = self.stroke_slider_rect["x"]
         sw = self.stroke_slider_rect["w"]
+        # Inverse of _slider_ratio_from_width: screen X position → pixel width
         ratio = (x - sx) / sw
-        ratio = max(0.0, min(1.0, ratio))
+        ratio = max(0.0, min(1.0, ratio))   # Clamp to [0, 1] so dragging outside bounds is safe
 
         if ratio <= 0.5:
             width = self.stroke_min + (ratio / 0.5) * (self.stroke_mid - self.stroke_min)
@@ -955,6 +961,7 @@ class Toolbar:
         if self.small_font.size(label)[0] <= max_width:
             return label, self.small_font
 
+        # Progressively truncate the label until it fits, then append "." as an ellipsis indicator
         candidate = label
         while len(candidate) > 1 and self.small_font.size(candidate + ".")[0] > max_width:
             candidate = candidate[:-1]

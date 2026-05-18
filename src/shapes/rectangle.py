@@ -8,12 +8,13 @@ from src.shapes.base import BaseShape
 class Rectangle(BaseShape):
     def __init__(self, x=0, y=0, width=100, height=60):
         super().__init__()
-        self.x = x
-        self.y = y
+        self.x = x    # Top-left corner X 
+        self.y = y    # Top-left corner Y
         self.width = width
         self.height = height
 
     def get_points(self):
+        # Vertices listed counter-clockwise starting from top-left
         return [
             (self.x, self.y),
             (self.x + self.width, self.y),
@@ -26,7 +27,7 @@ class Rectangle(BaseShape):
 
         if self.fill:
             glColor4f(*self.fill_color, self.alpha)
-            glBegin(GL_QUADS)
+            glBegin(GL_QUADS)       # GL_QUADS draws a filled quadrilateral from exactly 4 vertices
             for x, y in points:
                 glVertex2f(x, y)
             glEnd()
