@@ -240,7 +240,7 @@ This project was developed by the GraphiCore Lab team.
 | Name |
 |---|
 | Azra Culhacı |
-| Fulyye Havva Aykıt |
+| Fulya Havva Aykıt |
 | Serenat Varol |
 | Dila Öykü Eyüboğlu |
 | Burcu Kösedağı |
